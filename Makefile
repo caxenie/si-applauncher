@@ -1,5 +1,5 @@
 CFLAGS=-Wall -g -ldbus-1 -I/usr/include/dbus-1.0 -I/usr/lib/dbus-1.0/include
-PKGCONFIG=`pkg-config --libs --cflags dbus-1`
+PKGCONFIG=`pkg-config --libs --cflags dbus-1 glib-2.0 dbus-glib-1`
 daemon_SOURCES=src/al-daemon.c
 daemon_EXEC=al-daemon
 EXECUTABLES=al-daemon

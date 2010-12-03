@@ -23,6 +23,7 @@
 #include <dbus/dbus.h>
 #include <dirent.h>
 #include <errno.h>
+#include <glib.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -176,6 +177,100 @@ void AppNameFromPid(int p_pid, char *p_app_name)
   fclose(l_fp);
 }
 
+/* Function responsible to parse the .timer unit and extract the triggering key */
+GKeyFile *ParseUnitFile(char *p_file)
+{
+
+  unsigned long l_groups_length;
+  char **l_groups;
+  GKeyFile *l_out_new_key_file = g_key_file_new();
+  GError *l_err = NULL;
+
+  if (!g_key_file_load_from_file
+      (l_out_new_key_file, p_file, G_KEY_FILE_NONE, &l_err)) {
+    log_message
+	("AL Daemon : Cannot load from timer unit key file! (%d: %s)\n",
+	 l_err->code, l_err->message);
+    return NULL;
+    g_error_free(l_err);
+  }
+
+  l_groups = g_key_file_get_groups(l_out_new_key_file, &l_groups_length);
+  if (l_groups == NULL) {
+    log_message
+	("AL Daemon : Could not retrieve groups from %s timer unit file!\n",
+	 p_file);
+    return NULL;
+  }
+  unsigned long l_i;
+  for (l_i = 0; l_i < l_groups_length; l_i++) {
+    unsigned long l_keys_length;
+    char **l_keys;
+
+    l_keys =
+	g_key_file_get_keys(l_out_new_key_file, l_groups[l_i],
+			    &l_keys_length, &l_err);
+
+    if (l_keys == NULL) {
+      log_message
+	  ("AL Daemon : Error in retrieving keys in timer unit file! (%d: %s)",
+	   l_err->code, l_err->message);
+      g_error_free(l_err);
+    } else {
+      unsigned long l_j;
+      for (l_j = 0; l_j < l_keys_length; l_j++) {
+	char *l_str_value;
+	l_str_value =
+	    g_key_file_get_string(l_out_new_key_file, l_groups[l_i],
+				  l_keys[l_j], &l_err);
+	if (l_str_value == NULL) {
+	  log_message
+	      ("AL Daemon : Error retrieving key's value in timer unit file. (%d, %s)\n",
+	       l_err->code, l_err->message);
+	  g_error_free(l_err);
+	}
+
+      }
+    }
+  }
+
+  return l_out_new_key_file;
+}
+
+/* Function responsible to parse the .timer unit and setup the triggering key value */
+void SetupUnitFileKey(char *p_file, char *p_key, char *p_val)
+{
+
+  GKeyFile *l_key_file = ParseUnitFile(p_file);
+  unsigned long l_file_length;
+
+  if (p_file == NULL) {
+    exit(1);
+  }
+
+  g_key_file_set_string(l_key_file, "Timer", p_key, p_val);
+
+  GError *l_err = NULL;
+  char *l_new_file_data =
+      g_key_file_to_data(l_key_file, &l_file_length, &l_err);
+
+  g_key_file_free(l_key_file);
+
+  if (l_new_file_data == NULL) {
+    log_message
+	("AL Daemon : Could not get new file data for timer unit! (%d: %s)",
+	 l_err->code, l_err->message);
+    g_error_free(l_err);
+    exit(1);
+  }
+  if (!g_file_set_contents(p_file, l_new_file_data, l_file_length, &l_err)) {
+    log_message
+	("AL Daemon : Could not save new file for timer unit! (%d: %s)",
+	 l_err->code, l_err->message);
+    g_error_free(l_err);
+    exit(1);
+  }
+}
 
 /* High level interface for the AL Daemon */
 void Run(bool p_isFg, int p_parentPID, char *p_commandLine)
@@ -186,6 +281,15 @@ void Run(bool p_isFg, int p_parentPID, char *p_commandLine)
   log_message("%s started with run !\n", p_commandLine);
   char l_cmd[DIM_MAX];
   sprintf(l_cmd, "systemctl start %s.service", p_commandLine);
+  if (strcmp(p_commandLine, "reboot")) {
+    sprintf(l_cmd, "systemctl start %s.timer", p_commandLine);
+  }
+  if (strcmp(p_commandLine, "shutdown")) {
+    sprintf(l_cmd, "systemctl start %s.timer", p_commandLine);
+  }
+  if (strcmp(p_commandLine, "poweroff")) {
+    sprintf(l_cmd, "systemctl start %s.timer", p_commandLine);
+  }
   l_ret = system(l_cmd);
   if (l_ret == -1) {
     log_message
@@ -194,7 +298,8 @@ void Run(bool p_isFg, int p_parentPID, char *p_commandLine)
   }
 }
 
-void RunAs(int p_egid, int p_euid, bool p_isFg, int p_parentPID, char *p_commandLine)
+void RunAs(int p_egid, int p_euid, bool p_isFg, int p_parentPID,
+	   char *p_commandLine)
 {
   // TODO
   // egid, euid, isFg and parentPID usage when starting applications 
@@ -202,6 +307,15 @@ void RunAs(int p_egid, int p_euid, bool p_isFg, int p_parentPID, char *p_command
   log_message("%s started with runas !\n", p_commandLine);
   char l_cmd[DIM_MAX];
   sprintf(l_cmd, "systemctl start %s.service", p_commandLine);
+  if (strcmp(p_commandLine, "reboot")) {
+    sprintf(l_cmd, "systemctl start %s.timer", p_commandLine);
+  }
+  if (strcmp(p_commandLine, "shutdown")) {
+    sprintf(l_cmd, "systemctl start %s.timer", p_commandLine);
+  }
+  if (strcmp(p_commandLine, "poweroff")) {
+    sprintf(l_cmd, "systemctl start %s.timer", p_commandLine);
+  }
   l_ret = system(l_cmd);
 
   if (l_ret == -1) {
@@ -322,7 +436,8 @@ void AlSendAppSignal(char *p_sigvalue)
       dbus_bus_request_name(l_conn, AL_SIG_LISTENER,
 			    DBUS_NAME_FLAG_REPLACE_EXISTING, &l_err);
   if (dbus_error_is_set(&l_err)) {
-    log_message("AL Daemon Send Signal : Name Error (%s)\n", l_err.message);
+    log_message("AL Daemon Send Signal : Name Error (%s)\n",
+		l_err.message);
     dbus_error_free(&l_err);
   }
   if (DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER != l_ret) {
@@ -331,12 +446,12 @@ void AlSendAppSignal(char *p_sigvalue)
   // create a signal & check for errors 
   if (strcmp(p_sigvalue, AL_SIGNAME_TASK_STARTED) == 0) {
     l_msg = dbus_message_new_signal(SRM_OBJECT_PATH,	// object name of the signal
-				  AL_SIGNAL_INTERFACE,	// interface name of the signal
-				  AL_SIGNAME_TASK_STARTED);	// name of the signal
+				    AL_SIGNAL_INTERFACE,	// interface name of the signal
+				    AL_SIGNAME_TASK_STARTED);	// name of the signal
   } else if (strcmp(p_sigvalue, AL_SIGNAME_TASK_STOPPED) == 0) {
     l_msg = dbus_message_new_signal(SRM_OBJECT_PATH,	// object name of the signal
-				  AL_SIGNAL_INTERFACE,	// interface name of the signal
-				  AL_SIGNAME_TASK_STOPPED);	// name of the signal
+				    AL_SIGNAL_INTERFACE,	// interface name of the signal
+				    AL_SIGNAME_TASK_STOPPED);	// name of the signal
   }
   /* check for message state */
   if (NULL == l_msg) {
@@ -345,7 +460,8 @@ void AlSendAppSignal(char *p_sigvalue)
   }
   // append arguments onto signal
   dbus_message_iter_init_append(l_msg, &l_args);
-  if (!dbus_message_iter_append_basic(&l_args, DBUS_TYPE_STRING, &p_sigvalue)) {
+  if (!dbus_message_iter_append_basic
+      (&l_args, DBUS_TYPE_STRING, &p_sigvalue)) {
     log_message("AL Daemon Send Signal %s: Args Out Of Memory!\n",
 		p_sigvalue);
     exit(1);
@@ -367,7 +483,7 @@ void AlSendAppSignal(char *p_sigvalue)
 }
 
 /* Receive the method calls and reply */
-void AlReplyToMethodCall(DBusMessage *p_msg, DBusConnection *p_conn)
+void AlReplyToMethodCall(DBusMessage * p_msg, DBusConnection * p_conn)
 {
   /* reply message */
   DBusMessage *l_reply;
@@ -466,7 +582,8 @@ void AlListenToMethodCall()
   }
   if (DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER != l_ret) {
     log_message
-	("AL Daemon Method Call Listener : Not Primary Owner (%d)\n", l_ret);
+	("AL Daemon Method Call Listener : Not Primary Owner (%d)\n",
+	 l_ret);
     exit(1);
   }
   // loop, testing for new messages
@@ -488,6 +605,18 @@ void AlListenToMethodCall()
 			    DBUS_TYPE_STRING, &l_app_args,
 			    DBUS_TYPE_INVALID);
       log_message("Run app: %s\n", l_app);
+      if (strcmp(l_app, "reboot") == 0) {
+	SetupUnitFileKey("/lib/systemd/system/reboot.timer", "OnActiveSec",
+			 l_app_args);
+      }
+      if (strcmp(l_app, "shutdown") == 0) {
+	SetupUnitFileKey("/lib/systemd/system/shutdown.timer",
+			 "OnActiveSec", l_app_args);
+      }
+      if (strcmp(l_app, "poweroff") == 0) {
+	SetupUnitFileKey("/lib/systemd/system/poweroff.timer",
+			 "OnActiveSec", l_app_args);
+      }
       Run(true, 0, l_app);
     }
 
@@ -497,6 +626,18 @@ void AlListenToMethodCall()
 			    DBUS_TYPE_STRING, &l_app_args,
 			    DBUS_TYPE_INVALID);
       log_message("RunAs app: %s\n", l_app);
+      if (strcmp(l_app, "reboot") == 0) {
+	SetupUnitFileKey("/lib/systemd/system/reboot.timer", "OnActiveSec",
+			 l_app_args);
+      }
+      if (strcmp(l_app, "shutdown") == 0) {
+	SetupUnitFileKey("/lib/systemd/system/shutdown.timer",
+			 "OnActiveSec", l_app_args);
+      }
+      if (strcmp(l_app, "poweroff") == 0) {
+	SetupUnitFileKey("/lib/systemd/system/poweroff.timer",
+			 "OnActiveSec", l_app_args);
+      }
       RunAs(0, 0, true, 0, l_app);
     }
 

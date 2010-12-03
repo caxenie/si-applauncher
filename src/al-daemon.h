@@ -46,10 +46,11 @@ unsigned char g_verbose = 0;
 /* Function to extract PID value using the name of an application */
 extern pid_t AppPidFromName(char *app_name);
 /* Find application name from PID */
-void AppNameFromPid(int pid, char *app_name);
+extern void AppNameFromPid(int pid, char *app_name);
 /* High level interface for the AL Daemon */
 extern void Run(bool isFg, int parentPID, char *commandLine);
-extern void RunAs(int egid, int euid, bool isFg, int parentPID, char *commandLine);
+extern void RunAs(int egid, int euid, bool isFg, int parentPID,
+		  char *commandLine);
 extern void Suspend(int pid);
 extern void Resume(int pid);
 extern void Stop(int egid, int euid, int pid);
@@ -61,5 +62,9 @@ extern void AlSendAppSignal(char *sigvalue);
 extern void AlReplyToMethodCall(DBusMessage * msg, DBusConnection * conn);
 /* Server that exposes a method call and waits for it to be called */
 extern void AlListenToMethodCall();
+/* Function responsible to parse the .timer unit and extract the triggering key */
+extern GKeyFile *ParseUnitFile(char *file);
+/* Function responsible to parse the .timer unit and setup the triggering key value */
+extern void SetupUnitFileKey(char *file, char *key, char *val);
 
 #endif
