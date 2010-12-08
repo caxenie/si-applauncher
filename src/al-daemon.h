@@ -33,6 +33,10 @@
 #define SRM_OBJECT_PATH "/org/GENIVI/AppL"
 #define AL_SIGNAME_TASK_STARTED "TaskStarted"
 #define AL_SIGNAME_TASK_STOPPED "TaskStopped"
+#define AL_DAEMON_CALLER_NAME "org.freedesktop.systemd1"
+#define AL_DAEMON_SERVER_NAME "org.freedesktop.systemd1"
+#define AL_DAEMON_SYSTEM_INTERFACE "org.freedesktop.systemd1.Manager"
+#define AL_DAEMON_SYSTEM_OBJECT_PATH "/org/freedesktop/systemd1"
 #define DIM_MAX 200
 
 /* Tracing support */
@@ -66,5 +70,7 @@ extern void AlListenToMethodCall();
 extern GKeyFile *ParseUnitFile(char *file);
 /* Function responsible to parse the .timer unit and setup the triggering key value */
 extern void SetupUnitFileKey(char *file, char *key, char *val);
-
+/* Call a method on a system object */
+extern void AlSystemMethodCall(char *p_param, char *p_app,
+			       char *p_app_args);
 #endif

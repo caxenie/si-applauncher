@@ -51,7 +51,7 @@ pid_t AppPidFromName(char *p_app_name)
   l_dir = opendir("/proc");
   /* error handler */
   if (!l_dir) {
-    printf("Cannot open dir for %s\n!", p_app_name);
+    log_message("Cannot open dir for %s\n!", p_app_name);
     exit(1);
   }
   /* while there are more entries */
@@ -277,25 +277,39 @@ void Run(bool p_isFg, int p_parentPID, char *p_commandLine)
 {
   // TODO 
   // isFg and parentPID usage when starting applications
-  int l_ret;
-  log_message("%s started with run !\n", p_commandLine);
-  char l_cmd[DIM_MAX];
-  sprintf(l_cmd, "systemctl start %s.service", p_commandLine);
-  if (strcmp(p_commandLine, "reboot")) {
-    sprintf(l_cmd, "systemctl start %s.timer", p_commandLine);
+
+  /* extract application name and command line parameters
+     parsing the commandLine argument */
+
+  // delimiters for the command line argument
+  const char l_delim[] = "  ";
+  // current token in the command line
+  char *l_token;
+  // app name and options
+  char *l_name;
+  // copy of the original string to avoid modification
+  char *l_buff;
+
+  // copy the string
+  l_buff = strdup(p_commandLine);
+  // extract first token : app name
+  l_name = strtok(l_buff, l_delim);
+  // extract next tokens : app options
+  // init options string
+  l_token = strtok(NULL, l_delim);
+
+  if (strcmp(p_commandLine, "reboot") == 0) {
+    AlSystemMethodCall("Run", "reboot.timer", l_token);
   }
-  if (strcmp(p_commandLine, "shutdown")) {
-    sprintf(l_cmd, "systemctl start %s.timer", p_commandLine);
+  if (strcmp(p_commandLine, "poweroff") == 0) {
+    AlSystemMethodCall("Run", "poweroff.timer", l_token);
   }
-  if (strcmp(p_commandLine, "poweroff")) {
-    sprintf(l_cmd, "systemctl start %s.timer", p_commandLine);
+  if (strcmp(p_commandLine, "shutdown") == 0) {
+    AlSystemMethodCall("Run", "shutdown.timer", l_token);
   }
-  l_ret = system(l_cmd);
-  if (l_ret == -1) {
-    log_message
-	("AL Daemon : Application cannot be started with run! Err: %s\n",
-	 strerror(errno));
-  }
+  AlSystemMethodCall("Run", l_name, " ");
+  
+  log_message("%s started with run !\n", l_name);
 }
 
 void RunAs(int p_egid, int p_euid, bool p_isFg, int p_parentPID,
@@ -303,85 +317,75 @@ void RunAs(int p_egid, int p_euid, bool p_isFg, int p_parentPID,
 {
   // TODO
   // egid, euid, isFg and parentPID usage when starting applications 
-  int l_ret;
-  log_message("%s started with runas !\n", p_commandLine);
-  char l_cmd[DIM_MAX];
-  sprintf(l_cmd, "systemctl start %s.service", p_commandLine);
-  if (strcmp(p_commandLine, "reboot")) {
-    sprintf(l_cmd, "systemctl start %s.timer", p_commandLine);
-  }
-  if (strcmp(p_commandLine, "shutdown")) {
-    sprintf(l_cmd, "systemctl start %s.timer", p_commandLine);
-  }
-  if (strcmp(p_commandLine, "poweroff")) {
-    sprintf(l_cmd, "systemctl start %s.timer", p_commandLine);
-  }
-  l_ret = system(l_cmd);
+  /* extract application name and command line parameters
+     parsing the commandLine argument */
 
-  if (l_ret == -1) {
-    log_message
-	("AL Daemon : Application cannot be started with runas! Err: %s\n",
-	 strerror(errno));
+  // delimiters for the command line argument
+  const char l_delim[] = " -";
+  // current token in the command line
+  char *l_token;
+  // app name and options
+  char *l_name;
+  char l_options[DIM_MAX];
+  // copy of the original string to avoid modification
+  char *l_buff;
+  // copy the string
+  l_buff = strdup(p_commandLine);
+  // extract first token : app name
+  l_name = strtok(l_buff, l_delim);
+  // extract next tokens : app options
+  l_token = strtok(NULL, l_delim);
+
+  if (strcmp(p_commandLine, "reboot") == 0) {
+    AlSystemMethodCall("Run", "reboot.timer", l_token);
   }
+  if (strcmp(p_commandLine, "poweroff") == 0) {
+    AlSystemMethodCall("Run", "poweroff.timer", l_token);
+  }
+  if (strcmp(p_commandLine, "shutdown") == 0) {
+    AlSystemMethodCall("Run", "shutdown.timer", l_token);
+  }
+  AlSystemMethodCall("RunAs", l_name, " ");
+
+  log_message("%s started with RunAs !\n", l_name);
   // TODO add signaling mechanisms AlSendAppSignal(AL_SIGNAME_TASK_STARTED);
   // change out newPID
 }
 
 void Suspend(int p_pid)
 {
-  int l_ret;
+
   char l_app_name[DIM_MAX];
   char *l_commandLine;
   AppNameFromPid(p_pid, l_app_name);
   l_commandLine = l_app_name;
-  char l_cmd[DIM_MAX];
-  log_message("%s canceled with suspend !\n", l_commandLine);
-  sprintf(l_cmd, "systemctl cancel %s.service", l_commandLine);
-  l_ret = system(l_cmd);
+  AlSystemMethodCall("Suspend", strcat(l_commandLine, ".service"), " ");
 
-  if (l_ret == -1) {
-    log_message
-	("AL Daemon : Application cannot be suspended! Err:%s\n",
-	 strerror(errno));
-    // TODO add signaling mechanisms  AlSendAppSignal(AL_SIGNAME_TASK_STOPPED);
-  }
+
+  // TODO add signaling mechanisms  AlSendAppSignal(AL_SIGNAME_TASK_STOPPED);
 }
 
 void Resume(int p_pid)
 {
 
-  int l_ret;
+ 
   char l_app_name[DIM_MAX];
   char *l_commandLine;
   AppNameFromPid(p_pid, l_app_name);
   l_commandLine = l_app_name;
-  char l_cmd[DIM_MAX];
-  log_message("%s restarted with resume !\n", l_commandLine);
-  sprintf(l_cmd, "systemctl restart %s.service", l_commandLine);
-  l_ret = system(l_cmd);
-
-  if (l_ret == -1) {
-    log_message("AL Daemon : Application cannot be resumed! Err:%s\n",
-		strerror(errno));
-  }
+  AlSystemMethodCall("Resume", strcat(l_commandLine, ".service"), " ");
   //TODO add signaling mechanisms  AlSendAppSignal(AL_SIGNAME_TASK_STARTED);
 }
 
 void Stop(int p_egid, int p_euid, int p_pid)
 {
-  int l_ret;
+
   char l_app_name[DIM_MAX];
+  char *l_commandLine;
   AppNameFromPid(p_pid, l_app_name);
   printf("stopping %s\n", l_app_name);
-  char l_cmd[DIM_MAX];
-  log_message("%s stopped with stop !\n", l_app_name);
-  sprintf(l_cmd, "systemctl stop %s.service", l_app_name);
-  l_ret = system(l_cmd);
-
-  if (l_ret == -1) {
-    log_message("AL Daemon : Application cannot be stopped! Err:%s\n",
-		strerror(errno));
-  }
+  l_commandLine = l_app_name;
+  AlSystemMethodCall("Stop", strcat(l_commandLine, ".service"), " ");
   //TODO add signaling mechanisms   AlSendAppSignal(AL_SIGNAME_TASK_STOPPED);
 }
 
@@ -400,6 +404,176 @@ void TaskStopped()
   // out : char* ImagePath, int pid
 }
 
+/* Call a method on a system object */
+void AlSystemMethodCall(char *p_param, char *p_app, char *p_app_args)
+{
+  DBusMessage *l_msg;
+  DBusMessageIter l_args;
+  DBusConnection *l_conn;
+  DBusError l_err;
+  DBusPendingCall *l_pending;
+  int l_ret;
+  bool l_stat = 0;
+  dbus_uint32_t l_level = 0;
+
+
+  fprintf(stderr,
+	  "AL System Method Caller : Calling remote method %s for application %s\n",
+	  p_param, p_app);
+
+  // initialise the errors
+  dbus_error_init(&l_err);
+
+  // connect to the system bus and check for errors
+  l_conn = dbus_bus_get(DBUS_BUS_SYSTEM, &l_err);
+  if (dbus_error_is_set(&l_err)) {
+
+    fprintf(stderr,
+	    "AL System Method Caller : Connection Error (%s)\n",
+	    l_err.message);
+
+    dbus_error_free(&l_err);
+  }
+  if (NULL == l_conn) {
+    exit(1);
+  }
+  // request our name on the bus
+  l_ret =
+      dbus_bus_request_name(l_conn, AL_DAEMON_CALLER_NAME,
+			    DBUS_NAME_FLAG_REPLACE_EXISTING, &l_err);
+  if (dbus_error_is_set(&l_err)) {
+
+    fprintf(stderr, "AL System Method Caller : Name Error (%s)\n",
+	    l_err.message);
+
+    dbus_error_free(&l_err);
+  }
+  if (DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER != l_ret) {
+    exit(1);
+  }
+  // filter and create a new method call message and check for errors
+  if (strcmp(p_param, "Run") == 0) {
+
+    l_msg = dbus_message_new_method_call(AL_DAEMON_SERVER_NAME,	// target for the method call
+					 AL_DAEMON_SYSTEM_OBJECT_PATH,	// object to call on
+					 AL_DAEMON_SYSTEM_INTERFACE,	// interface to call on
+					 "StartUnit");	// method name
+  } else if (strcmp(p_param, "RunAs") == 0) {
+
+    l_msg = dbus_message_new_method_call(AL_DAEMON_SERVER_NAME,	// target for the method call
+					 AL_DAEMON_SYSTEM_OBJECT_PATH,	// object to call on
+					 AL_DAEMON_SYSTEM_INTERFACE,	// interface to call on
+					 "StartUnit");	// method name
+  } else if (strcmp(p_param, "Stop") == 0) {
+
+    l_msg = dbus_message_new_method_call(AL_DAEMON_SERVER_NAME,	// target for the method call
+					 AL_DAEMON_SYSTEM_OBJECT_PATH,	// object to call on
+					 AL_DAEMON_SYSTEM_INTERFACE,	// interface to call on
+					 "StopUnit");	// method name
+  } else if (strcmp(p_param, "Suspend") == 0) {
+
+    l_msg = dbus_message_new_method_call(AL_DAEMON_SERVER_NAME,	// target for the method call
+					 AL_DAEMON_SYSTEM_OBJECT_PATH,	// object to call on
+					 AL_DAEMON_SYSTEM_INTERFACE,	// interface to call on
+					 "CreateSnapshot");	// method name
+  } else if (strcmp(p_param, "Resume") == 0) {
+
+    l_msg = dbus_message_new_method_call(AL_DAEMON_SERVER_NAME,	// target for the method call
+					 AL_DAEMON_SYSTEM_OBJECT_PATH,	// object to call on
+					 AL_DAEMON_SYSTEM_INTERFACE,	// interface to call on
+					 "StartUnit");	// method name
+  }
+  if (NULL == l_msg) {
+
+    fprintf(stderr, "AL System Method Caller : Message Null\n");
+
+    exit(1);
+  }
+  // append necessary arguments (application name and arguments)
+  dbus_message_append_args(l_msg, DBUS_TYPE_STRING, &p_app,
+			   DBUS_TYPE_STRING, &p_app_args,
+			   DBUS_TYPE_INVALID);
+
+  // append arguments
+  dbus_message_iter_init_append(l_msg, &l_args);
+  if (!dbus_message_iter_append_basic(&l_args, DBUS_TYPE_STRING, &p_param)) {
+
+    fprintf(stderr, "AL System Method Caller : Args Out Of Memory!\n");
+
+    exit(1);
+  }
+
+// send message and get a handle for a reply
+  if (!dbus_connection_send_with_reply(l_conn, l_msg, &l_pending, -1)) {	// -1 is default timeout
+    
+    fprintf(stderr,
+	    "AL System Method Caller : Connection Out Of Memory!\n");
+    
+    exit(1);
+  }
+  if (NULL == l_pending) {
+    
+    fprintf(stderr, "AL System Method Caller : Pending Call Null\n");
+    
+    exit(1);
+  }
+  // flush the connection
+  dbus_connection_flush(l_conn);
+    
+  fprintf(stderr, "AL System Method Caller : Request Sent\n");
+    
+  // free message
+  dbus_message_unref(l_msg);
+
+  // block until we recieve a reply
+  dbus_pending_call_block(l_pending);
+
+  // get the reply message
+  l_msg = dbus_pending_call_steal_reply(l_pending);
+  if (NULL == l_msg) {
+    
+    fprintf(stderr, "AL System Method Caller : Reply Null\n");
+    
+    exit(1);
+  }
+
+  // free the pending message handle
+  dbus_pending_call_unref(l_pending);
+
+  // read the parameters
+  if (!dbus_message_iter_init(l_msg, &l_args)) {
+
+    fprintf(stderr,
+	    "AL System Method Caller : Message has no arguments!\n");
+
+  } else if (DBUS_TYPE_BOOLEAN != dbus_message_iter_get_arg_type(&l_args)) {
+
+    fprintf(stderr,
+	    "AL System Method Caller : Argument is not boolean!\n");
+
+  } else {
+    dbus_message_iter_get_basic(&l_args, &l_stat);
+  }
+
+  if (!dbus_message_iter_next(&l_args)) {
+
+    fprintf(stderr,
+	    "AL System Method Caller : Message has too few arguments!\n");
+
+  } else if (DBUS_TYPE_UINT32 != dbus_message_iter_get_arg_type(&l_args)) {
+
+    fprintf(stderr, "AL System Method Caller : Argument is not int!\n");
+
+  } else {
+    dbus_message_iter_get_basic(&l_args, &l_level);
+  }
+
+  fprintf(stderr, "AL System Method Caller : Got Reply: %d, %d\n",
+	  l_stat, l_level);
+
+   // free reply
+  dbus_message_unref(l_msg);
+}
 
 /* Connect to the DBUS bus and send a broadcast signal */
 void AlSendAppSignal(char *p_sigvalue)
@@ -550,6 +724,7 @@ void AlListenToMethodCall()
   int l_ret;
   char *l_app;
   char *l_app_args;
+  char *l_cmdLine;
 
   log_message
       ("AL Daemon Method Call Listener : Listening for method calls!%s",
@@ -606,8 +781,8 @@ void AlListenToMethodCall()
 			    DBUS_TYPE_INVALID);
       log_message("Run app: %s\n", l_app);
       if (strcmp(l_app, "reboot") == 0) {
-	SetupUnitFileKey("/lib/systemd/system/reboot.timer", "OnActiveSec",
-			 l_app_args);
+	SetupUnitFileKey("/lib/systemd/system/reboot.timer",
+			 "OnActiveSec", l_app_args);
       }
       if (strcmp(l_app, "shutdown") == 0) {
 	SetupUnitFileKey("/lib/systemd/system/shutdown.timer",
@@ -617,7 +792,11 @@ void AlListenToMethodCall()
 	SetupUnitFileKey("/lib/systemd/system/poweroff.timer",
 			 "OnActiveSec", l_app_args);
       }
-      Run(true, 0, l_app);
+      // build the command line
+      strcpy(l_cmdLine, l_app);
+      strcat(l_cmdLine, " ");
+      strcat(l_cmdLine, l_app_args);
+      Run(true, 0, l_cmdLine);
     }
 
     if (dbus_message_is_method_call(l_msg, AL_METHOD_INTERFACE, "RunAs")) {
@@ -627,8 +806,8 @@ void AlListenToMethodCall()
 			    DBUS_TYPE_INVALID);
       log_message("RunAs app: %s\n", l_app);
       if (strcmp(l_app, "reboot") == 0) {
-	SetupUnitFileKey("/lib/systemd/system/reboot.timer", "OnActiveSec",
-			 l_app_args);
+	SetupUnitFileKey("/lib/systemd/system/reboot.timer",
+			 "OnActiveSec", l_app_args);
       }
       if (strcmp(l_app, "shutdown") == 0) {
 	SetupUnitFileKey("/lib/systemd/system/shutdown.timer",
@@ -638,7 +817,11 @@ void AlListenToMethodCall()
 	SetupUnitFileKey("/lib/systemd/system/poweroff.timer",
 			 "OnActiveSec", l_app_args);
       }
-      RunAs(0, 0, true, 0, l_app);
+      // build the command line
+      strcpy(l_cmdLine, l_app);
+      strcat(l_cmdLine, " ");
+      strcat(l_cmdLine, l_app_args);
+      RunAs(0, 0, true, 0, l_cmdLine);
     }
 
     if (dbus_message_is_method_call(l_msg, AL_METHOD_INTERFACE, "Stop")) {
