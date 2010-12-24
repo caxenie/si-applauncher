@@ -1,0 +1,11 @@
+
+The application launcher component (al-daemon) provides an API to enable state change
+for the applications running in the system at a certain moment. The exported functionality
+comprises specific API calls for starting and stopping applications as well as cancel, 
+suspend and resume operations. Each application is managed in the sense of resource 
+allocation using foreground or background execution contexts. 
+
+The application launcher daemon should interact with the other life-cycle components 
+in the system (System Resource Manager, System Health Monitor, Platform State Manager).
+
+
