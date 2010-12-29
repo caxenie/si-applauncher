@@ -308,13 +308,13 @@ void Run(bool p_isFg, int p_parentPID, char *p_commandLine)
   log_message("%s started with run !\n", p_commandLine);
   char l_cmd[DIM_MAX];
   sprintf(l_cmd, "systemctl start %s.service", p_commandLine);
-  if (strcmp(p_commandLine, "reboot")) {
+  if (strcmp(p_commandLine, "reboot")==0) {
     sprintf(l_cmd, "systemctl start %s.timer", p_commandLine);
   }
-  if (strcmp(p_commandLine, "shutdown")) {
+  if (strcmp(p_commandLine, "shutdown")==0) {
     sprintf(l_cmd, "systemctl start %s.timer", p_commandLine);
   }
-  if (strcmp(p_commandLine, "poweroff")) {
+  if (strcmp(p_commandLine, "poweroff")==0) {
     sprintf(l_cmd, "systemctl start %s.timer", p_commandLine);
   }
   l_ret = system(l_cmd);
@@ -334,13 +334,13 @@ void RunAs(int p_egid, int p_euid, bool p_isFg, int p_parentPID,
   log_message("%s started with runas !\n", p_commandLine);
   char l_cmd[DIM_MAX];
   sprintf(l_cmd, "systemctl start %s.service", p_commandLine);
-  if (strcmp(p_commandLine, "reboot")) {
+  if (strcmp(p_commandLine, "reboot")==0) {
     sprintf(l_cmd, "systemctl start %s.timer", p_commandLine);
   }
-  if (strcmp(p_commandLine, "shutdown")) {
+  if (strcmp(p_commandLine, "shutdown")==0) {
     sprintf(l_cmd, "systemctl start %s.timer", p_commandLine);
   }
-  if (strcmp(p_commandLine, "poweroff")) {
+  if (strcmp(p_commandLine, "poweroff")==0) {
     sprintf(l_cmd, "systemctl start %s.timer", p_commandLine);
   }
   l_ret = system(l_cmd);
