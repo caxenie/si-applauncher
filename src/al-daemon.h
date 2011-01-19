@@ -26,13 +26,14 @@
 #define AL_DBUS_SERVICE "org.GENIVI.AppL"
 #define AL_CALLER_NAME "org.GENIVI.AppL.caller"
 #define AL_SERVER_NAME "org.GENIVI.AppL.server"
-#define AL_SIG_TRIGGER "org.GENIVI.AppL.listener"
+#define AL_SIG_TRIGGER "org.GENIVI.AppL"
 #define AL_SIG_LISTENER "org.GENIVI.AppL"
 #define AL_METHOD_INTERFACE "org.GENIVI.AppL.method"
 #define AL_SIGNAL_INTERFACE "org.GENIVI.AppL.signal"
 #define SRM_OBJECT_PATH "/org/GENIVI/AppL"
 #define AL_SIGNAME_TASK_STARTED "TaskStarted"
 #define AL_SIGNAME_TASK_STOPPED "TaskStopped"
+#define AL_SIGNAME_NOTIFICATION "GlobalStateNotification"
 #define DIM_MAX 200
 
 /* Tracing support */
@@ -66,5 +67,11 @@ extern void AlListenToMethodCall();
 extern GKeyFile *ParseUnitFile(char *file);
 /* Function responsible to parse the .timer unit and setup the triggering key value */
 extern void SetupUnitFileKey(char *file, char *key, char *val, char *unit);
-
+/* Function to extract the status of an application after starting it or that is already running in the system */
+extern int AlGetAppState(DBusConnection * bus, char *p_app_name,
+			 char *p_state_info);
+/* Function responsible to broadcast the state of an application that started execution or an application already running in the system  */
+extern void AlAppStateNotifier(char *p_app_name);
+/* Function responsible to test if a given application exists in the system. */
+extern int AppExistsInSystem(char *p_app_name);
 #endif
