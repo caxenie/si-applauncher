@@ -27,6 +27,7 @@
 #include <fcntl.h>
 #include <glib/gstdio.h>
 #include <glib.h>
+#include <libgen.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -124,9 +125,7 @@ pid_t AppPidFromName(char *p_app_name)
       l_pid = strtol(l_next->d_name, NULL, 0);
       return l_pid;
     }
-
   }
-
   return (pid_t) 0;
 }
 
@@ -361,10 +360,9 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
   DBusMessage *l_msg = NULL, *l_reply = NULL;
   /* define interface to use and properties to fetch */
   const char
-      *interface = "org.freedesktop.systemd1.Unit",
+  *interface = "org.freedesktop.systemd1.Unit",
       *l_as_property = "ActiveState",
-      *l_ls_property = "LoadState", 
-      *l_ss_property = "SubState";
+      *l_ls_property = "LoadState", *l_ss_property = "SubState";
   /* store the state */
   char *l_state;
   /* return code */
@@ -377,6 +375,9 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
   /* store the current global state attributes */
   char *l_as_state, *l_ls_state, *l_ss_state;
   DBusMessageIter l_iter, l_sub_iter;
+  /* image path and pid */
+  char *l_imagePath;
+  int l_pid;
   /* new method call to get unit information */
   if (!(l_msg = dbus_message_new_method_call("org.freedesktop.systemd1",
 					     "/org/freedesktop/systemd1",
@@ -679,9 +680,9 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
   /* form the global state string */
   strcpy(l_state, p_app_name);
   strcat(l_state, " ");
-  strcat(l_state, l_as_state);
-  strcat(l_state, " ");
   strcat(l_state, l_ls_state);
+  strcat(l_state, " ");
+  strcat(l_state, l_as_state);
   strcat(l_state, " ");
   strcat(l_state, l_ss_state);
 
@@ -701,16 +702,14 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
   l_msg = l_reply = NULL;
 
 free_res:
-
+  /* free the messages */
   if (l_msg)
     dbus_message_unref(l_msg);
 
   if (l_reply)
     dbus_message_unref(l_reply);
-
+  /* free the error */
   dbus_error_free(&l_error);
-
-  log_message("AL Daemon State Extractor : Return code is %d \n", l_ret);
 
   return l_ret;
 }
@@ -796,7 +795,7 @@ void AlAppStateNotifier(char *p_app_name)
 	(" AL Daemon Send Notification : Global State information for %s -> [ %s ] \n",
 	 p_app_name, l_app_status);
 
-    /* create a signal & check for errors */
+    /* create a signal for global state notification & check for errors */
     l_msg = dbus_message_new_signal(SRM_OBJECT_PATH,
 				    AL_SIGNAL_INTERFACE,
 				    "GlobalStateNotification");
@@ -805,7 +804,6 @@ void AlAppStateNotifier(char *p_app_name)
     if (NULL == l_msg) {
       log_message("AL Daemon Send Notification for %s : Message Null\n",
 		  p_app_name);
-
       return;
     }
     log_message
@@ -846,11 +844,11 @@ void AlAppStateNotifier(char *p_app_name)
 }
 
 
-
 /* High level interface for the AL Daemon */
 void Run(bool p_isFg, int p_parentPID, char *p_commandLine)
 {
   // TODO isFg and parentPID usage when starting applications
+  // [out] newPID: INT32, isFg: BOOLEAN, parentPID: INT32, commandLine: STRING
   /* store the return code */
   int l_ret;
   log_message("%s started with run !\n", p_commandLine);
@@ -881,6 +879,7 @@ void RunAs(int p_egid, int p_euid, bool p_isFg, int p_parentPID,
 	   char *p_commandLine)
 {
   // TODO egid, euid, isFg and parentPID usage when starting applications 
+  // egid: INT32, euid: INT32, [out] newPID: INT32, isFg: BOOLEAN, parentPID: INT32, commandLine: STRING
   /* store the return code */
   int l_ret;
   log_message("%s started with runas !\n", p_commandLine);
@@ -905,7 +904,6 @@ void RunAs(int p_egid, int p_euid, bool p_isFg, int p_parentPID,
 	("AL Daemon : Application cannot be started with runas! Err: %s\n",
 	 strerror(errno));
   }
-  // TODO add signaling mechanisms AlSendAppSignal(AL_SIGNAME_TASK_STARTED); change out newPID
 }
 
 void Suspend(int p_pid)
@@ -930,7 +928,6 @@ void Suspend(int p_pid)
     log_message
 	("AL Daemon : Application cannot be suspended! Err:%s\n",
 	 strerror(errno));
-    // TODO add signaling mechanisms  AlSendAppSignal(AL_SIGNAME_TASK_STOPPED);
   }
 }
 
@@ -956,7 +953,6 @@ void Resume(int p_pid)
     log_message("AL Daemon : Application cannot be resumed! Err:%s\n",
 		strerror(errno));
   }
-  //TODO add signaling mechanisms  AlSendAppSignal(AL_SIGNAME_TASK_STARTED);
 }
 
 void Stop(int p_egid, int p_euid, int p_pid)
@@ -981,30 +977,28 @@ void Stop(int p_egid, int p_euid, int p_pid)
     log_message("AL Daemon : Application cannot be stopped! Err:%s\n",
 		strerror(errno));
   }
-  //TODO add signaling mechanisms   AlSendAppSignal(AL_SIGNAME_TASK_STOPPED);
 }
 
-void TaskStarted()
+void TaskStarted(char *p_imagePath, int p_pid)
 {
-
-  log_message("Task received %s signal!\n", AL_SIGNAME_TASK_STARTED);
-
-  // TODO out : char* ImagePath , int pid
+  log_message
+      ("AL Daemon : Task %d %s was started and signal %s was emitted!\n",
+       p_pid, p_imagePath, AL_SIGNAME_TASK_STARTED);
 }
 
-void TaskStopped()
+void TaskStopped(char *p_imagePath, int p_pid)
 {
-
-  log_message("Task received %s signal!\n", AL_SIGNAME_TASK_STOPPED);
-  // TODO out : char* ImagePath, int pid
+  log_message
+      ("AL Daemon : Task %d %s was stopped and signal %s was emitted!\n",
+       p_pid, p_imagePath, AL_SIGNAME_TASK_STOPPED);
 }
 
 
-/* Connect to the DBUS bus and send a broadcast signal */
-void AlSendAppSignal(char *p_sigvalue)
+/* Connect to the DBUS bus and send a broadcast signal about the state of the application */
+void AlSendAppSignal(char *p_app_name)
 {
   /* message to be sent */
-  DBusMessage *l_msg;
+  DBusMessage *l_msg, *l_reply;
   /* message arguments */
   DBusMessageIter l_args;
   /* connection to the bus */
@@ -1013,10 +1007,35 @@ void AlSendAppSignal(char *p_sigvalue)
   DBusError l_err;
   /* return code */
   int l_ret;
+  /* reply information */
   dbus_uint32_t l_serial = 0;
+  /* global state info */
+  char l_state_info[DIM_MAX];
+  char *l_app_status;
+  /* application start/stop auxiliary vars : active state, app name, 
+     global state, service name, message to send */
+  char *l_active_state = malloc(DIM_MAX * sizeof(l_active_state));
+  char *l_app_name = malloc(DIM_MAX * sizeof(l_app_name));
+  char *l_service_name = malloc(DIM_MAX * sizeof(l_service_name));
+  char *l_state_msg = malloc(DIM_MAX * sizeof(l_state_msg));
+  /* delimiters for service / application name extraction */
+  char l_delim_serv[] = " ";
+  char l_delim_app[] = ".";
+  /* application pid */
+  int l_pid;
+  char l_pid_string[DIM_MAX];
+  /* initialize the path */
+  const char *l_path = NULL;
+  /* message iterators for pid extraction */
+  DBusMessageIter l_iter, l_sub_iter;
 
-  log_message("AL Daemon Send Signal : Sending signal with value %s\n",
-	      p_sigvalue);
+  /* interface and method to acces application pid */
+  const char *l_interface =
+      "org.freedesktop.systemd1.Service", *l_pid_property = "ExecMainPID";
+
+  log_message
+      ("AL Daemon Send Active State Notification : Sending signal for  %s\n",
+       p_app_name);
 
   /* initialise the error value */
   dbus_error_init(&l_err);
@@ -1024,62 +1043,262 @@ void AlSendAppSignal(char *p_sigvalue)
   /* connect to the DBUS system bus, and check for errors */
   l_conn = dbus_bus_get(DBUS_BUS_SYSTEM, &l_err);
   if (dbus_error_is_set(&l_err)) {
-    log_message("AL Daemon Send Signal : Connection Error (%s)\n",
-		l_err.message);
+    log_message
+	("AL Daemon Send Active State Notification : Connection Error (%s)\n",
+	 l_err.message);
     dbus_error_free(&l_err);
   }
   if (NULL == l_conn) {
     return;
   }
-  /* register our name on the bus, and check for errors */
+  /* register the name on the bus, and check for errors */
   l_ret =
-      dbus_bus_request_name(l_conn, AL_SIG_LISTENER,
+      dbus_bus_request_name(l_conn, AL_SIG_TRIGGER,
 			    DBUS_NAME_FLAG_REPLACE_EXISTING, &l_err);
   if (dbus_error_is_set(&l_err)) {
-    log_message("AL Daemon Send Signal : Name Error (%s)\n",
-		l_err.message);
+    log_message
+	("AL Daemon Send Active State Notification : Name Error (%s)\n",
+	 l_err.message);
     dbus_error_free(&l_err);
   }
+  /* check for primary owner on the request */
   if (DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER != l_ret) {
-    exit(EXIT_FAILURE);
+    if (DBUS_REQUEST_NAME_REPLY_ALREADY_OWNER != l_ret) {
+      return;
+    }
   }
-  /* create a signal & check for errors  */
-  if (strcmp(p_sigvalue, AL_SIGNAME_TASK_STARTED) == 0) {
-    l_msg = dbus_message_new_signal(SRM_OBJECT_PATH,	/* object name of the signal */
-				    AL_SIGNAL_INTERFACE,	/* interface name of the signal */
-				    AL_SIGNAME_TASK_STARTED);	/* name of the signal */
-  } else if (strcmp(p_sigvalue, AL_SIGNAME_TASK_STOPPED) == 0) {
-    l_msg = dbus_message_new_signal(SRM_OBJECT_PATH,	/* object name of the signal */
-				    AL_SIGNAL_INTERFACE,	/* interface name of the signal */
-				    AL_SIGNAME_TASK_STOPPED);	/* name of the signal */
-  }
-  /* check for message state */
-  if (NULL == l_msg) {
-    log_message("AL Daemon Send Signal %s : Message Null\n", p_sigvalue);
-    return;
-  }
-  /* append arguments onto signal */
-  dbus_message_iter_init_append(l_msg, &l_args);
-  if (!dbus_message_iter_append_basic
-      (&l_args, DBUS_TYPE_STRING, &p_sigvalue)) {
-    log_message("AL Daemon Send Signal %s: Args Out Of Memory!\n",
-		p_sigvalue);
-    return;
-  }
-  /* send the message and flush the connection */
-  if (!dbus_connection_send(l_conn, l_msg, &l_serial)) {
+
+  log_message
+      ("AL Daemon Send Active State Notification : Checked primary owner for %s\n",
+       p_app_name);
+
+  /* extract the information to broadcast */
+  log_message
+      ("AL Daemon Send Active State Notification : Getting application state for %s \n",
+       p_app_name);
+
+  /* extract the PID for the application that will be stopped because it won't be available in /proc anymore */
+
+  if (!(l_msg = dbus_message_new_method_call("org.freedesktop.systemd1",
+					     "/org/freedesktop/systemd1",
+					     "org.freedesktop.systemd1.Manager",
+					     "GetUnit"))) {
     log_message
-	("AL Daemon Send Signal %s: Connection Out Of Memory!\n",
-	 p_sigvalue);
-    return;
+	("AL Daemon Send Active State Notification : Could not allocate message for %s\n",
+	 p_app_name);
+    l_ret = -ENOMEM;
+    goto free_res;
   }
-  /* flush the connection */
-  dbus_connection_flush(l_conn);
-
-  log_message("AL Daemon Send Signal %s: Signal Sent\n", p_sigvalue);
-
-  /* free the message */
+  /* append application name as argument to method call */
+  if (!dbus_message_append_args(l_msg,
+				DBUS_TYPE_STRING, &p_app_name,
+				DBUS_TYPE_INVALID)) {
+    log_message
+	("AL Daemon Send Active State Notification : Could not append arguments to message for %s\n",
+	 p_app_name);
+    l_ret = -ENOMEM;
+    goto free_res;
+  }
+  /* send the message on the bus and wait for a reply */
+  if (!(l_reply =
+	dbus_connection_send_with_reply_and_block(l_conn, l_msg, -1,
+						  &l_err))) {
+    log_message
+	("AL Daemon Send Active State Notification : Unknown information for %s \n",
+	 p_app_name);
+    log_message
+	("AL Daemon Send Active State Notification : Error [%s: %s]\n",
+	 l_err.name, l_err.message);
+    goto free_res;
+  }
+  /* extract arguments from the reply; the object path is useful for property fetch */
+  if (!dbus_message_get_args(l_reply, &l_err,
+			     DBUS_TYPE_OBJECT_PATH, &l_path,
+			     DBUS_TYPE_INVALID)) {
+    log_message
+	("AL Daemon Send Active State Notification : Failed to parse reply for %s\n",
+	 p_app_name);
+    l_ret = -EIO;
+    goto free_res;
+  }
+  /* unrereference the message */
   dbus_message_unref(l_msg);
+  /* issue a new method call to extract properties for the unit */
+  if (!(l_msg = dbus_message_new_method_call("org.freedesktop.systemd1",
+					     l_path,
+					     "org.freedesktop.DBus.Properties",
+					     "Get"))) {
+    log_message
+	("AL Daemon Send Active State Notification : Could not allocate message for %s \n",
+	 p_app_name);
+    l_ret = -ENOMEM;
+    goto free_res;
+  }
+  /* append the arguments; the main pid will be needed */
+  if (!dbus_message_append_args(l_msg,
+				DBUS_TYPE_STRING, &l_interface,
+				DBUS_TYPE_STRING, &l_pid_property,
+				DBUS_TYPE_INVALID)) {
+    log_message
+	("AL Daemon Send Active State Notification : Could not append arguments to message for %s \n",
+	 p_app_name);
+    l_ret = -ENOMEM;
+    goto free_res;
+  }
+  /* unreference the reply */
+  dbus_message_unref(l_reply);
+  /* send the message over the systemd bus and wait for a reply */
+  if (!(l_reply =
+	dbus_connection_send_with_reply_and_block(l_conn, l_msg, -1,
+						  &l_err))) {
+    log_message
+	("AL Daemon Send Active State Notification : Failed to issue method call for %s\n",
+	 p_app_name);
+    l_ret = -EIO;
+    goto free_res;
+  }
+  /* parse reply and extract arguments */
+  if (!dbus_message_iter_init(l_reply, &l_iter) ||
+      dbus_message_iter_get_arg_type(&l_iter) != DBUS_TYPE_VARIANT) {
+    log_message
+	("AL Daemon Send Active State Notification : Failed to parse reply for %s\n",
+	 p_app_name);
+    l_ret = -EIO;
+    goto free_res;
+  }
+  /* sub iterator for reply  */
+  dbus_message_iter_recurse(&l_iter, &l_sub_iter);
+  /* argument type check */
+  if (dbus_message_iter_get_arg_type(&l_sub_iter) != DBUS_TYPE_UINT32) {
+    log_message
+	("AL Daemon Send Active State Notification : Failed to get arg type for %s when fetching pid!\n",
+	 p_app_name);
+    l_ret = -EIO;
+    goto free_res;
+  }
+  /* extract the argument as a basic type */
+  dbus_message_iter_get_basic(&l_sub_iter, &l_pid);
+
+  /* FIXME adjust the pid after extracting it from ExecMainPID */
+  l_pid = l_pid + 1;
+
+  /* unreference the message */
+  dbus_message_unref(l_msg);
+
+  /* extract the application state  */
+  if (AlGetAppState(l_conn, p_app_name, l_state_info) == 0) {
+
+    log_message
+	("AL Daemon Send Active State Notification : Received application state for %s \n",
+	 p_app_name);
+
+    /* copy the state */
+    l_app_status = strdup(l_state_info);
+
+    log_message
+	(" AL Daemon Send Active State Notification : Global State information for %s -> [ %s ] \n",
+	 p_app_name, l_app_status);
+
+    log_message
+	(" AL Daemon Send Active State Notification : Application state is %s \n",
+	 l_app_status);
+
+    /* service name extraction from global state info */
+    l_service_name = strtok(l_app_status, l_delim_serv);
+    /* active state extraaction from global state info */
+    l_active_state = strtok(NULL, l_delim_serv);
+    l_active_state = strtok(NULL, l_delim_serv);
+    l_app_name = strtok(l_service_name, l_delim_app);
+    /* form the application status message to send */
+    strcpy(l_state_msg, l_app_name);
+    strcat(l_state_msg, " ");
+    sprintf(l_pid_string, "%d", l_pid);
+    strcat(l_state_msg, l_pid_string);
+    strcat(l_state_msg, " ");
+
+    /* test if application was started and signal this event */
+    if (strcmp(l_active_state, "active") == 0) {
+
+      /* append to dbus signal the application status */
+      strcat(l_state_msg, AL_SIGNAME_TASK_STARTED);
+      TaskStarted(l_app_name, l_pid);
+      /* create a signal & check for errors */
+      l_msg = dbus_message_new_signal(SRM_OBJECT_PATH,
+				      AL_SIGNAL_INTERFACE,
+				      AL_SIGNAME_TASK_STARTED);
+    }
+
+    /* test if application was stopped and became inactive and signal this event */
+    if (strcmp(l_active_state, "inactive") == 0) {
+      /* append to dbus signal the application status */
+      strcat(l_state_msg, AL_SIGNAME_TASK_STOPPED);
+      TaskStopped(l_app_name, l_pid);
+      /* create a signal & check for errors */
+      l_msg = dbus_message_new_signal(SRM_OBJECT_PATH,
+				      AL_SIGNAL_INTERFACE,
+				      AL_SIGNAME_TASK_STOPPED);
+    }
+
+    /* test if application failed and stopped and signal this event */
+    if (strcmp(l_active_state, "failed") == 0) {
+      /* append to dbus signal the application status */
+      strcat(l_state_msg, AL_SIGNAME_TASK_STOPPED);
+      TaskStopped(l_app_name, l_pid);
+      /* create a signal & check for errors */
+      l_msg = dbus_message_new_signal(SRM_OBJECT_PATH,
+				      AL_SIGNAL_INTERFACE,
+				      AL_SIGNAME_TASK_STOPPED);
+    }
+
+    /* check for message state */
+    if (NULL == l_msg) {
+      log_message
+	  ("AL Daemon Send Active State Notification : for %s : Message Null\n",
+	   p_app_name);
+
+      return;
+    }
+    log_message
+	("AL Daemon Send Active State Notification: Appending state arguments for %s\n",
+	 p_app_name);
+
+    /* append arguments onto the end of message (signal) */
+    dbus_message_iter_init_append(l_msg, &l_args);
+    log_message
+	("AL Daemon Send Active State Notification : Initialized iterator for appending message arguments at end for %s\n",
+	 p_app_name);
+
+    /* append status information encoded in a string */
+    if (!dbus_message_iter_append_basic
+	(&l_args, DBUS_TYPE_STRING, &l_state_msg)) {
+
+      log_message
+	  ("AL Daemon Send Active State Notification : Could not append image path for %s!\n",
+	   p_app_name);
+    }
+
+    /* send the message and flush the connection */
+    if (!dbus_connection_send(l_conn, l_msg, &l_serial)) {
+      log_message
+	  ("AL Daemon Send Active State Notification : for %s: Connection Out Of Memory!\n",
+	   p_app_name);
+    }
+
+    log_message
+	("AL Daemon Send Active State Notification for %s: Signal Sent\n",
+	 p_app_name);
+  }
+
+free_res:
+  /* free the messages */
+  if (l_msg)
+    dbus_message_unref(l_msg);
+
+  if (l_reply)
+    dbus_message_unref(l_reply);
+  /* free the error */
+  dbus_error_free(&l_err);
+
 }
 
 /* Receive the method calls and reply */
@@ -1136,6 +1355,7 @@ void AlReplyToMethodCall(DBusMessage * p_msg, DBusConnection * p_conn)
 	 "\n");
     return;
   }
+  /* flush the connection */
   dbus_connection_flush(p_conn);
 
   /* free the reply */
@@ -1155,6 +1375,7 @@ void AlListenToMethodCall()
   int l_ret, l_r;
   /* auxiliary storage for name handling */
   char *l_app;
+  /* application arguments */
   char *l_app_args;
   char *l_app_name;
 
@@ -1193,7 +1414,7 @@ void AlListenToMethodCall()
 	 l_ret);
     return;
   }
-  /* connect to the bus ti listen for signals and check for errors */
+  /* connect to the bus to listen for signals and check for errors */
   l_conn_sig = dbus_bus_get(DBUS_BUS_SYSTEM, &l_err);
   if (dbus_error_is_set(&l_err)) {
     log_message
@@ -1212,7 +1433,6 @@ void AlListenToMethodCall()
 		     "sender='org.freedesktop.systemd1',"
 		     "interface='org.freedesktop.DBus.Properties',"
 		     "member='PropertiesChanged'", &l_err);
-
   if (dbus_error_is_set(&l_err)) {
     log_message
 	("AL Daemon Method Call Listener : Failed to add signal matcher: %s\n",
@@ -1220,6 +1440,7 @@ void AlListenToMethodCall()
 
     if (l_msg)
       dbus_message_unref(l_msg);
+
 
     dbus_error_free(&l_err);
   }
@@ -1396,7 +1617,7 @@ void AlListenToMethodCall()
 	  continue;
 	}
 	log_message
-	    ("AL Daemon Method Call Listener : Cannot suspend %s !\n Application %s is found in the system but is nalready suspended!\n",
+	    ("AL Daemon Method Call Listener : Cannot suspend %s !\n Application %s is found in the system but is already suspended!\n",
 	     l_app, l_app);
 	continue;
       }
@@ -1522,8 +1743,10 @@ void AlListenToMethodCall()
 	dbus_message_iter_get_basic(&l_sub_iter, &l_id);
 	log_message("AL Daemon Method Call Listener : Unit %s changed.\n",
 		    l_id);
-	/* notify clients about changes */
+	/* notify clients about tasks global state changes */
 	AlAppStateNotifier((char *) l_id);
+	/* notify about task started/stopped */
+	AlSendAppSignal((char *) l_id);
       }
     }
   }
