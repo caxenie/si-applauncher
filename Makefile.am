@@ -1,6 +1,6 @@
 ACLOCAL_AMFLAGS = -I m4
 
-bin_PROGRAMS = al_daemon
+bin_PROGRAMS = al-daemon
 al_daemon_SOURCES = src/al-daemon.c \
 			src/al-daemon.h
 al_daemon_LDADD = $(INTLLIBS) $(DBUS_LIBS) $(DBUSGLIB_LIBS) $(GLIB2_LIBS)

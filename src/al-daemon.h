@@ -26,13 +26,14 @@
 #define AL_DBUS_SERVICE "org.GENIVI.AppL"
 #define AL_CALLER_NAME "org.GENIVI.AppL.caller"
 #define AL_SERVER_NAME "org.GENIVI.AppL.server"
-#define AL_SIG_TRIGGER "org.GENIVI.AppL.listener"
+#define AL_SIG_TRIGGER "org.GENIVI.AppL"
 #define AL_SIG_LISTENER "org.GENIVI.AppL"
 #define AL_METHOD_INTERFACE "org.GENIVI.AppL.method"
 #define AL_SIGNAL_INTERFACE "org.GENIVI.AppL.signal"
 #define SRM_OBJECT_PATH "/org/GENIVI/AppL"
 #define AL_SIGNAME_TASK_STARTED "TaskStarted"
 #define AL_SIGNAME_TASK_STOPPED "TaskStopped"
+#define AL_SIGNAME_NOTIFICATION "GlobalStateNotification"
 #define DIM_MAX 200
 
 /* Tracing support */
@@ -54,10 +55,11 @@ extern void RunAs(int egid, int euid, bool isFg, int parentPID,
 extern void Suspend(int pid);
 extern void Resume(int pid);
 extern void Stop(int egid, int euid, int pid);
-extern void TaskStarted();
-extern void TaskStopped();
-/* Connect to the DBUS bus and send a broadcast signal */
-extern void AlSendAppSignal(char *sigvalue);
+/* Send start/stop signals over the bus to the clients */
+extern void TaskStarted(char *imagePath, int pid);
+extern void TaskStopped(char *imagePath, int pid);
+/* Connect to the DBUS bus and send a broadcast signal regarding application state */
+extern void AlSendAppSignal(char *name);
 /* Receive the method calls and reply */
 extern void AlReplyToMethodCall(DBusMessage * msg, DBusConnection * conn);
 /* Server that exposes a method call and waits for it to be called */
@@ -66,5 +68,11 @@ extern void AlListenToMethodCall();
 extern GKeyFile *ParseUnitFile(char *file);
 /* Function responsible to parse the .timer unit and setup the triggering key value */
 extern void SetupUnitFileKey(char *file, char *key, char *val, char *unit);
-
+/* Function to extract the status of an application after starting it or that is already running in the system */
+extern int AlGetAppState(DBusConnection * bus, char *app_name,
+			 char *state_info);
+/* Function responsible to broadcast the state of an application that started execution or an application already running in the system  */
+extern void AlAppStateNotifier(char *app_name);
+/* Function responsible to test if a given application exists in the system. */
+extern int AppExistsInSystem(char *app_name);
 #endif
