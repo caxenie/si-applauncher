@@ -1802,6 +1802,7 @@ int main(int argc, char **argv)
     if (2 > argc) {
       fprintf(stdout, "Syntax: al-daemon --start [--verbose|-v] [--version|-V]\n"
 	      "\tal-daemon --stop\n");
+      fprintf(stdout, "\nAL Daemon version %s\n", AL_VERSION);
       return 1;
     }
     if (0 == strcmp(argv[1], "--start")) {
