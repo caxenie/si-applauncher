@@ -1,0 +1,13 @@
+[Unit]
+Description=Systemctl Monitor
+After=dbus.service
+Before=al_daemon.service
+Requires=dbus.service
+
+[Service]
+Type=simple
+RemainAfterExit=true
+ExecStart=/bin/systemctl monitor
+
+[Install]
+WantedBy=multi-user.target

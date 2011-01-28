@@ -1,0 +1,12 @@
+[Unit]
+Description=Application launcher daemon
+After=dbus.service systemctl_monitor.service
+Requires=dbus.service systemctl_monitor.service
+
+[Service]
+Type=simple
+RemainAfterExit=true
+ExecStart=/usr/bin/al-daemon --start
+
+[Install]
+WantedBy=multi-user.target
