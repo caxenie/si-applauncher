@@ -1800,22 +1800,44 @@ int main(int argc, char **argv)
   while (1) {
 
     if (2 > argc) {
-      fprintf(stdout, "Syntax: al-daemon --start [--verbose|-v]\n"
+      fprintf(stdout, "Syntax: al-daemon --start [--verbose|-v] [--version|-V]\n"
 	      "\tal-daemon --stop\n");
       return 1;
     }
     if (0 == strcmp(argv[1], "--start")) {
-      if (argc == 3) {
+       if (argc == 3) {
 	if ((0 == strcmp(argv[2], "--verbose"))
 	    || (0 == strcmp(argv[2], "-v"))) {
 	  g_verbose = 1;
 	}
+        if ((0 == strcmp(argv[2], "--version"))
+	    || (0 == strcmp(argv[2], "-V"))) {
+	 fprintf(stdout, "\nAL Daemon version %s\n", AL_VERSION);
+	}
       }
+      if (argc == 4) {
+	if ((0 == strcmp(argv[2], "--verbose"))
+	    || (0 == strcmp(argv[2], "-v"))) {
+	  g_verbose = 1;
+	}
+        if ((0 == strcmp(argv[3], "--version"))
+	    || (0 == strcmp(argv[3], "-V"))) {
+	  fprintf(stdout, "\nAL Daemon version %s\n", AL_VERSION);
+	}
+       if ((0 == strcmp(argv[3], "--verbose"))
+	    || (0 == strcmp(argv[3], "-v"))) {
+	  g_verbose = 1;
+	}
+        if ((0 == strcmp(argv[2], "--version"))
+	    || (0 == strcmp(argv[2], "-V"))) {
+	 fprintf(stdout, "\nAL Daemon version %s\n", AL_VERSION);
+	}
+      } 
       AlListenToMethodCall();
     } else if (0 == strcmp(argv[1], "--stop")) {
       system("killall -9 al-daemon");
     } else {
-      fprintf(stdout, "Syntax: al-daemon --start [-verbose|-v]\n"
+      fprintf(stdout, "Syntax: al-daemon --start [-verbose|-v] [--version|-V]\n"
 	      "\tal-daemon --stop\n");
 
       return 1;

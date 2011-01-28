@@ -35,6 +35,7 @@
 #define AL_SIGNAME_TASK_STOPPED "TaskStopped"
 #define AL_SIGNAME_NOTIFICATION "GlobalStateNotification"
 #define DIM_MAX 200
+#define AL_VERSION "1.1"
 
 /* Tracing support */
 unsigned char g_verbose = 0;
