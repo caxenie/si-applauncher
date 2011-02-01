@@ -349,7 +349,7 @@ void SetupUnitFileKey(char *p_file, char *p_key, char *p_val, char *p_unit)
 }
 
 /* 
- * Function responisible to extract the status of an application after starting it or that is already running in the system. 
+ * Function responsible to extract the status of an application after starting it or that is already running in the system. 
  * This refers to extracting : Load State, Active State and Sub State.
  */
 
@@ -1012,9 +1012,10 @@ void AlSendAppSignal(char *p_app_name)
   /* global state info */
   char l_state_info[DIM_MAX];
   char *l_app_status;
-  /* application start/stop auxiliary vars : active state, app name, 
+  /* application start/stop auxiliary vars : active state, sub state, app name, 
      global state, service name, message to send */
   char *l_active_state = malloc(DIM_MAX * sizeof(l_active_state));
+  char *l_sub_state = malloc(DIM_MAX * sizeof(l_sub_state));
   char *l_app_name = malloc(DIM_MAX * sizeof(l_app_name));
   char *l_service_name = malloc(DIM_MAX * sizeof(l_service_name));
   char *l_state_msg = malloc(DIM_MAX * sizeof(l_state_msg));
@@ -1250,6 +1251,42 @@ void AlSendAppSignal(char *p_app_name)
 				      AL_SIGNAME_TASK_STOPPED);
     }
 
+    /* test if application is in a transitional state to activation */
+    if (strcmp(l_active_state, "activating") == 0) {
+      /* the task is in a transitional state to active */
+      log_message
+	  ("AL Daemon Send Active State Notification : The application %s is in %s state and will be activated !",
+	   l_app_name, l_active_state);
+      log_message
+	  ("AL Daemon Send Active State Notification : The new state for %s will be fetched after entering a stable state!",
+	   l_app_name);
+      return;
+    }
+
+    /* test if application is in a transitional state to deactivation */
+    if (strcmp(l_active_state, "deactivating") == 0) {
+      /* the task is in a transitional state to active */
+      log_message
+	  ("AL Daemon Send Active State Notification : The application %s is in %s state and will be deactivated !",
+	   l_app_name, l_active_state);
+      log_message
+	  ("AL Daemon Send Active State Notification : The new state for %s will be fetched after entering a stable state!",
+	   l_app_name);
+      return;
+    }
+
+    /* test if application is in a transitional state to reload */
+    if (strcmp(l_active_state, "reloading") == 0) {
+      /* the task is in a transitional state to active */
+      log_message
+	  ("AL Daemon Send Active State Notification : The application %s is in %s state and will be reloaded !",
+	   l_app_name, l_active_state);
+      log_message
+	  ("AL Daemon Send Active State Notification : The new state for %s will be fetched after entering a stable state!",
+	   l_app_name);
+      return;
+    }
+
     /* check for message state */
     if (NULL == l_msg) {
       log_message
@@ -1366,7 +1403,7 @@ void AlReplyToMethodCall(DBusMessage * p_msg, DBusConnection * p_conn)
 void AlListenToMethodCall()
 {
   /* define message and reply */
-  DBusMessage *l_msg, *l_reply;
+  DBusMessage *l_msg_methods, *l_msg_signals, *l_reply;
   /* define connection for default method calls and notification signals */
   DBusConnection *l_conn, *l_conn_sig;
   /* error definition */
@@ -1378,6 +1415,13 @@ void AlListenToMethodCall()
   /* application arguments */
   char *l_app_args;
   char *l_app_name;
+  /* variables for state extraction */
+  char *l_app_status;
+  char l_state_info[DIM_MAX];
+  char *l_active_state = malloc(DIM_MAX * sizeof(l_active_state));
+  char *l_sub_state = malloc(DIM_MAX * sizeof(l_sub_state));
+  /* delimiters for service / application name extraction */
+  char l_delim_serv[] = " ";
 
   log_message
       ("AL Daemon Method Call Listener : Listening for method calls!%s",
@@ -1438,8 +1482,11 @@ void AlListenToMethodCall()
 	("AL Daemon Method Call Listener : Failed to add signal matcher: %s\n",
 	 l_err.message);
 
-    if (l_msg)
-      dbus_message_unref(l_msg);
+    if (l_msg_methods)
+      dbus_message_unref(l_msg_methods);
+
+    if (l_msg_signals)
+      dbus_message_unref(l_msg_signals);
 
 
     dbus_error_free(&l_err);
@@ -1454,8 +1501,12 @@ void AlListenToMethodCall()
 	("AL Daemon Method Call Listener : Failed to add method call matcher: %s\n",
 	 l_err.message);
 
-    if (l_msg)
-      dbus_message_unref(l_msg);
+    if (l_msg_methods)
+      dbus_message_unref(l_msg_methods);
+
+    if (l_msg_signals)
+      dbus_message_unref(l_msg_signals);
+
 
     dbus_error_free(&l_err);
   }
@@ -1464,20 +1515,22 @@ void AlListenToMethodCall()
     /* non blocking read of the next available message */
     dbus_connection_read_write(l_conn, 0);
     dbus_connection_read_write(l_conn_sig, 0);
-    l_msg = dbus_connection_pop_message(l_conn);
+    l_msg_methods = dbus_connection_pop_message(l_conn);
+    l_msg_signals = dbus_connection_pop_message(l_conn_sig);
 
     /* loop again if we haven't got a message */
-    if (NULL == l_msg) {
+    if ((NULL == l_msg_methods) && (NULL == l_msg_signals)) {
       sleep(1);
       continue;
     }
 
     /* check if this is a method call for the right interface amd method */
-    if (dbus_message_is_method_call(l_msg, AL_METHOD_INTERFACE, "Run")) {
-      AlReplyToMethodCall(l_msg, l_conn);
+    if (dbus_message_is_method_call
+	(l_msg_methods, AL_METHOD_INTERFACE, "Run")) {
+      AlReplyToMethodCall(l_msg_methods, l_conn);
       /* extract application name and arguments */
-      dbus_message_get_args(l_msg, &l_err, DBUS_TYPE_STRING, &l_app,
-			    DBUS_TYPE_STRING, &l_app_args,
+      dbus_message_get_args(l_msg_methods, &l_err, DBUS_TYPE_STRING,
+			    &l_app, DBUS_TYPE_STRING, &l_app_args,
 			    DBUS_TYPE_INVALID);
       log_message("AL Daemon Method Call Listener : Run app: %s\n", l_app);
       /* if reboot / shutdown unit add deferred functionality in timer file */
@@ -1489,6 +1542,7 @@ void AlListenToMethodCall()
 	SetupUnitFileKey("/lib/systemd/system/poweroff.timer",
 			 "OnActiveSec", l_app_args, "poweroff");
       }
+
       /* check for application service file existence */
       if (!AppExistsInSystem(l_app)) {
 	log_message
@@ -1498,9 +1552,34 @@ void AlListenToMethodCall()
       } else {
 	if ((l_r = (int) AppPidFromName(l_app)) != 0) {
 	  log_message
-	      ("AL Daemon Method Call Listener : Cannot run %s !\n Application %s is found in the system and is already running !\n",
-	       l_app, l_app);
-	  continue;
+	      ("AL Daemon Method Call Listener : Cannot run %s !\n",
+	       l_app);
+
+	  /* check the application current state before starting it */
+	  /* extract the application state for testing existence */
+	  if (AlGetAppState
+	      (l_conn, strcat(l_app, ".service"), l_state_info) == 0) {
+
+	    /* copy the state */
+	    l_app_status = strdup(l_state_info);
+
+	    /* active state extraction from global state info */
+	    l_active_state = strtok(l_app_status, l_delim_serv);
+	    l_active_state = strtok(NULL, l_delim_serv);
+	    l_active_state = strtok(NULL, l_delim_serv);
+	    l_sub_state = strtok(NULL, l_delim_serv);
+
+	  }
+	  if (strcmp(l_active_state, "active") == 0) {
+	    if ((strcmp(l_sub_state, "exited") != 0)
+		|| (strcmp(l_sub_state, "dead") != 0)
+		|| (strcmp(l_sub_state, "failed") != 0)) {
+	      log_message
+		  ("AL Daemon Method Call Listener : Cannot run %s !\n Application %s is already running in the system !\n",
+		   l_app, l_app);
+	      continue;
+	    }
+	  }
 	}
       }
       /* run the application */
@@ -1508,11 +1587,12 @@ void AlListenToMethodCall()
 
     }
     /* check if this is a method call for the right interface amd method */
-    if (dbus_message_is_method_call(l_msg, AL_METHOD_INTERFACE, "RunAs")) {
-      AlReplyToMethodCall(l_msg, l_conn);
+    if (dbus_message_is_method_call
+	(l_msg_methods, AL_METHOD_INTERFACE, "RunAs")) {
+      AlReplyToMethodCall(l_msg_methods, l_conn);
       /* extract application name and arguments */
-      dbus_message_get_args(l_msg, &l_err, DBUS_TYPE_STRING, &l_app,
-			    DBUS_TYPE_STRING, &l_app_args,
+      dbus_message_get_args(l_msg_methods, &l_err, DBUS_TYPE_STRING,
+			    &l_app, DBUS_TYPE_STRING, &l_app_args,
 			    DBUS_TYPE_INVALID);
       /* if reboot / shutdown unit add deferred functionality in timer file */
       log_message("AL Daemon Method Call Listener : RunAs app: %s\n",
@@ -1534,9 +1614,34 @@ void AlListenToMethodCall()
       } else {
 	if ((l_r = (int) AppPidFromName(l_app)) != 0) {
 	  log_message
-	      ("AL Daemon Method Call Listener : Cannot run %s !\n Application %s is found in the system and is already running !\n",
-	       l_app, l_app);
-	  continue;
+	      ("AL Daemon Method Call Listener : Cannot runas %s !\n",
+	       l_app);
+
+	  /* check the application current state before starting it */
+	  /* extract the application state for testing existence */
+	  if (AlGetAppState
+	      (l_conn, strcat(l_app, ".service"), l_state_info) == 0) {
+
+	    /* copy the state */
+	    l_app_status = strdup(l_state_info);
+
+	    /* active state extraction from global state info */
+	    l_active_state = strtok(l_app_status, l_delim_serv);
+	    l_active_state = strtok(NULL, l_delim_serv);
+	    l_active_state = strtok(NULL, l_delim_serv);
+	    l_sub_state = strtok(NULL, l_delim_serv);
+
+	  }
+	  if (strcmp(l_active_state, "active") == 0) {
+	    if ((strcmp(l_sub_state, "exited") != 0)
+		|| (strcmp(l_sub_state, "dead") != 0)
+		|| (strcmp(l_sub_state, "failed") != 0)) {
+	      log_message
+		  ("AL Daemon Method Call Listener : Cannot runas %s !\n Application %s is already running in the system !\n",
+		   l_app, l_app);
+	      continue;
+	    }
+	  }
 	}
       }
       /* runas the application */
@@ -1544,11 +1649,12 @@ void AlListenToMethodCall()
 
     }
     /* check if this is a method call for the right interface amd method */
-    if (dbus_message_is_method_call(l_msg, AL_METHOD_INTERFACE, "Stop")) {
-      AlReplyToMethodCall(l_msg, l_conn);
+    if (dbus_message_is_method_call
+	(l_msg_methods, AL_METHOD_INTERFACE, "Stop")) {
+      AlReplyToMethodCall(l_msg_methods, l_conn);
       /* extract application name */
-      dbus_message_get_args(l_msg, &l_err, DBUS_TYPE_STRING, &l_app,
-			    DBUS_TYPE_INVALID);
+      dbus_message_get_args(l_msg_methods, &l_err, DBUS_TYPE_STRING,
+			    &l_app, DBUS_TYPE_INVALID);
       log_message
 	  ("AL Daemon Method Call Listener : Stopping application %s\n",
 	   l_app);
@@ -1562,20 +1668,47 @@ void AlListenToMethodCall()
 	  continue;
 	}
 	log_message
-	    ("AL Daemon Method Call Listener : Cannot stop %s !\n Application %s is found in the system and is already stopped !\n",
+	    ("AL Daemon Method Call Listener : Cannot stop %s !\n",
 	     l_app, l_app);
-	continue;
+
+	/* check the application current state before starting it */
+	/* extract the application state for testing existence */
+	if (AlGetAppState(l_conn, strcat(l_app, ".service"), l_state_info)
+	    == 0) {
+
+	  /* copy the state */
+	  l_app_status = strdup(l_state_info);
+
+	  /* active state extraction from global state info */
+	  l_active_state = strtok(l_app_status, l_delim_serv);
+	  l_active_state = strtok(NULL, l_delim_serv);
+	  l_active_state = strtok(NULL, l_delim_serv);
+	  l_sub_state = strtok(NULL, l_delim_serv);
+
+	}
+
+	if ((strcmp(l_active_state, "active") != 0)
+	    && (strcmp(l_active_state, "reloading") != 0)
+	    && (strcmp(l_active_state, "activating") != 0)
+	    && (strcmp(l_active_state, "deactivating") != 0)) {
+
+	  log_message
+	      ("AL Daemon Method Call Listener : Cannot stop %s !\n Application %s is already stopped !\n",
+	       l_app, l_app);
+	  continue;
+	}
       }
       /* stop the application */
       Stop(0, 0, (int) AppPidFromName(l_app));
 
     }
     /* check if this is a method call for the right interface amd method */
-    if (dbus_message_is_method_call(l_msg, AL_METHOD_INTERFACE, "Resume")) {
-      AlReplyToMethodCall(l_msg, l_conn);
+    if (dbus_message_is_method_call
+	(l_msg_methods, AL_METHOD_INTERFACE, "Resume")) {
+      AlReplyToMethodCall(l_msg_methods, l_conn);
       /* extract the application name */
-      dbus_message_get_args(l_msg, &l_err, DBUS_TYPE_STRING, &l_app,
-			    DBUS_TYPE_INVALID);
+      dbus_message_get_args(l_msg_methods, &l_err, DBUS_TYPE_STRING,
+			    &l_app, DBUS_TYPE_INVALID);
       log_message
 	  ("AL Daemon Method Call Listener : Resuming application %s\n",
 	   l_app);
@@ -1589,9 +1722,35 @@ void AlListenToMethodCall()
 	  continue;
 	}
 	log_message
-	    ("AL Daemon Method Call Listener : Cannot resume %s !\n Application %s is found in the system and already running!\n",
+	    ("AL Daemon Method Call Listener : Cannot resume %s !\n",
 	     l_app, l_app);
-	continue;
+
+	/* check the application current state before starting it */
+	/* extract the application state for testing existence */
+	if (AlGetAppState(l_conn, strcat(l_app, ".service"), l_state_info)
+	    == 0) {
+
+	  /* copy the state */
+	  l_app_status = strdup(l_state_info);
+
+	  /* active state extraction from global state info */
+	  l_active_state = strtok(l_app_status, l_delim_serv);
+	  l_active_state = strtok(NULL, l_delim_serv);
+	  l_active_state = strtok(NULL, l_delim_serv);
+	  l_sub_state = strtok(NULL, l_delim_serv);
+
+	}
+
+	if (strcmp(l_active_state, "active") == 0) {
+	  if ((strcmp(l_sub_state, "exited") != 0)
+	      || (strcmp(l_sub_state, "dead") != 0)
+	      || (strcmp(l_sub_state, "failed") != 0)) {
+	    log_message
+		("AL Daemon Method Call Listener : Cannot run %s !\n Application %s is already running in the system !\n",
+		 l_app, l_app);
+	    continue;
+	  }
+	}
       }
       /* resume the application */
       Resume((int) AppPidFromName(l_app));
@@ -1599,11 +1758,12 @@ void AlListenToMethodCall()
     }
 
     /* check if this is a method call for the right interface amd method */
-    if (dbus_message_is_method_call(l_msg, AL_METHOD_INTERFACE, "Suspend")) {
-      AlReplyToMethodCall(l_msg, l_conn);
+    if (dbus_message_is_method_call
+	(l_msg_methods, AL_METHOD_INTERFACE, "Suspend")) {
+      AlReplyToMethodCall(l_msg_methods, l_conn);
       /* extract the application name */
-      dbus_message_get_args(l_msg, &l_err, DBUS_TYPE_STRING, &l_app,
-			    DBUS_TYPE_INVALID);
+      dbus_message_get_args(l_msg_methods, &l_err, DBUS_TYPE_STRING,
+			    &l_app, DBUS_TYPE_INVALID);
       log_message
 	  ("AL Daemon Method Call Listener : Suspending application %s\n",
 	   l_app);
@@ -1617,24 +1777,51 @@ void AlListenToMethodCall()
 	  continue;
 	}
 	log_message
-	    ("AL Daemon Method Call Listener : Cannot suspend %s !\n Application %s is found in the system but is already suspended!\n",
+	    ("AL Daemon Method Call Listener : Cannot suspend %s !\n",
 	     l_app, l_app);
-	continue;
+
+	/* check the application current state before starting it */
+	/* extract the application state for testing existence */
+	if (AlGetAppState(l_conn, strcat(l_app, ".service"), l_state_info)
+	    == 0) {
+
+	  /* copy the state */
+	  l_app_status = strdup(l_state_info);
+
+	  /* active state extraction from global state info */
+	  l_active_state = strtok(l_app_status, l_delim_serv);
+	  l_active_state = strtok(NULL, l_delim_serv);
+	  l_active_state = strtok(NULL, l_delim_serv);
+	  l_sub_state = strtok(NULL, l_delim_serv);
+
+	}
+
+	if ((strcmp(l_active_state, "active") != 0)
+	    && (strcmp(l_active_state, "reloading") != 0)
+	    && (strcmp(l_active_state, "activating") != 0)
+	    && (strcmp(l_active_state, "deactivating") != 0)) {
+
+	  log_message
+	      ("AL Daemon Method Call Listener : Cannot suspend %s !\n Application %s is already suspended !\n",
+	       l_app, l_app);
+	  continue;
+	}
       }
       /* suspend the application */
       Suspend((int) AppPidFromName(l_app));
 
     }
-    /* separate connection to listen to signals */
-    l_msg = dbus_connection_pop_message(l_conn_sig);
-    /* wait for messages */
-    if (NULL == l_msg) {
+
+    /* wait for messages on the signal dedicated connection */
+    if (NULL == l_msg_signals) {
       sleep(1);
       continue;
     }
+
     /* consider only property change notification signals */
     if (dbus_message_is_signal
-	(l_msg, "org.freedesktop.DBus.Properties", "PropertiesChanged")) {
+	(l_msg_signals, "org.freedesktop.DBus.Properties",
+	 "PropertiesChanged")) {
       /* handling variables for object path, interface and property */
       const char *l_path, *l_interface, *l_property = "Id";
       /* initialize reply iterators */
@@ -1644,65 +1831,66 @@ void AlListenToMethodCall()
 	  ("AL Daemon Signal Listener : An application changed state !%s",
 	   "\n");
       /* get object path for message */
-      l_path = dbus_message_get_path(l_msg);
+      l_path = dbus_message_get_path(l_msg_signals);
       /* extract the interface name from message */
-      if (!dbus_message_get_args(l_msg, &l_err,
+      if (!dbus_message_get_args(l_msg_signals, &l_err,
 				 DBUS_TYPE_STRING, &l_interface,
 				 DBUS_TYPE_INVALID)) {
 	log_message
 	    ("AL Daemon Method Call Listener : Failed to parse message: %s",
 	     l_err.message);
-	if (l_msg)
-	  dbus_message_unref(l_msg);
+	if (l_msg_signals)
+	  dbus_message_unref(l_msg_signals);
 
 	dbus_error_free(&l_err);
 	continue;
       }
       /* filter only the unit specific interface */
       if (strcmp(l_interface, "org.freedesktop.systemd1.Unit") != 0) {
-	if (l_msg)
+	if (l_msg_signals)
 	  /* free the message */
-	  dbus_message_unref(l_msg);
+	  dbus_message_unref(l_msg_signals);
 	dbus_error_free(&l_err);
 	return;
       }
       /* new method call to get unit properties */
       if (!
-	  (l_msg =
+	  (l_msg_signals =
 	   dbus_message_new_method_call("org.freedesktop.systemd1", l_path,
 					"org.freedesktop.DBus.Properties",
 					"Get"))) {
 	log_message
 	    ("AL Daemon Method Call Listener : Could not allocate message for %s !\n",
 	     l_path);
-	if (l_msg)
-	  dbus_message_unref(l_msg);
+	if (l_msg_signals)
+	  dbus_message_unref(l_msg_signals);
 	dbus_error_free(&l_err);
 	continue;
       }
       /* append arguments for the message */
-      if (!dbus_message_append_args(l_msg,
+      if (!dbus_message_append_args(l_msg_signals,
 				    DBUS_TYPE_STRING, &l_interface,
 				    DBUS_TYPE_STRING, &l_property,
 				    DBUS_TYPE_INVALID)) {
 	log_message
 	    ("AL Daemon Method Call Listener : Could not append arguments to message for %s !\n",
 	     l_path);
-	if (l_msg)
-	  dbus_message_unref(l_msg);
+	if (l_msg_signals)
+	  dbus_message_unref(l_msg_signals);
 	dbus_error_free(&l_err);
 	continue;
       }
       /* send the message and wait for a reply */
       if (!
 	  (l_reply =
-	   dbus_connection_send_with_reply_and_block(l_conn_sig, l_msg, -1,
+	   dbus_connection_send_with_reply_and_block(l_conn_sig,
+						     l_msg_signals, -1,
 						     &l_err))) {
 	log_message
 	    ("AL Daemon Signal Listener : Failed to issue method call: %s",
 	     l_err.message);
-	if (l_msg)
-	  dbus_message_unref(l_msg);
+	if (l_msg_signals)
+	  dbus_message_unref(l_msg_signals);
 	if (l_reply)
 	  dbus_message_unref(l_reply);
 	dbus_error_free(&l_err);
@@ -1714,8 +1902,8 @@ void AlListenToMethodCall()
 	log_message
 	    ("AL Daemon Signal Call Listener : Failed to parse reply for %s !\n",
 	     l_path);
-	if (l_msg)
-	  dbus_message_unref(l_msg);
+	if (l_msg_signals)
+	  dbus_message_unref(l_msg_signals);
 	if (l_reply)
 	  dbus_message_unref(l_reply);
 	dbus_error_free(&l_err);
@@ -1732,8 +1920,8 @@ void AlListenToMethodCall()
 	  log_message
 	      ("AL Daemon Method Call Listener : Failed to parse reply for %s !",
 	       l_path);
-	  if (l_msg)
-	    dbus_message_unref(l_msg);
+	  if (l_msg_signals)
+	    dbus_message_unref(l_msg_signals);
 	  if (l_reply)
 	    dbus_message_unref(l_reply);
 	  dbus_error_free(&l_err);
@@ -1751,7 +1939,9 @@ void AlListenToMethodCall()
     }
   }
   /* free the message */
-  dbus_message_unref(l_msg);
+  dbus_message_unref(l_msg_methods);
+  dbus_message_unref(l_msg_signals);
+
 }
 
 /* application launcher daemon entrypoint */
@@ -1800,20 +1990,21 @@ int main(int argc, char **argv)
   while (1) {
 
     if (2 > argc) {
-      fprintf(stdout, "Syntax: al-daemon --start [--verbose|-v] [--version|-V]\n"
+      fprintf(stdout,
+	      "Syntax: al-daemon --start [--verbose|-v] [--version|-V]\n"
 	      "\tal-daemon --stop\n");
       fprintf(stdout, "\nAL Daemon version %s\n", AL_VERSION);
       return 1;
     }
     if (0 == strcmp(argv[1], "--start")) {
-       if (argc == 3) {
+      if (argc == 3) {
 	if ((0 == strcmp(argv[2], "--verbose"))
 	    || (0 == strcmp(argv[2], "-v"))) {
 	  g_verbose = 1;
 	}
-        if ((0 == strcmp(argv[2], "--version"))
+	if ((0 == strcmp(argv[2], "--version"))
 	    || (0 == strcmp(argv[2], "-V"))) {
-	 fprintf(stdout, "\nAL Daemon version %s\n", AL_VERSION);
+	  fprintf(stdout, "\nAL Daemon version %s\n", AL_VERSION);
 	}
       }
       if (argc == 4) {
@@ -1821,24 +2012,25 @@ int main(int argc, char **argv)
 	    || (0 == strcmp(argv[2], "-v"))) {
 	  g_verbose = 1;
 	}
-        if ((0 == strcmp(argv[3], "--version"))
+	if ((0 == strcmp(argv[3], "--version"))
 	    || (0 == strcmp(argv[3], "-V"))) {
 	  fprintf(stdout, "\nAL Daemon version %s\n", AL_VERSION);
 	}
-       if ((0 == strcmp(argv[3], "--verbose"))
+	if ((0 == strcmp(argv[3], "--verbose"))
 	    || (0 == strcmp(argv[3], "-v"))) {
 	  g_verbose = 1;
 	}
-        if ((0 == strcmp(argv[2], "--version"))
+	if ((0 == strcmp(argv[2], "--version"))
 	    || (0 == strcmp(argv[2], "-V"))) {
-	 fprintf(stdout, "\nAL Daemon version %s\n", AL_VERSION);
+	  fprintf(stdout, "\nAL Daemon version %s\n", AL_VERSION);
 	}
-      } 
+      }
       AlListenToMethodCall();
     } else if (0 == strcmp(argv[1], "--stop")) {
       system("killall -9 al-daemon");
     } else {
-      fprintf(stdout, "Syntax: al-daemon --start [-verbose|-v] [--version|-V]\n"
+      fprintf(stdout,
+	      "Syntax: al-daemon --start [--verbose|-v] [--version|-V]\n"
 	      "\tal-daemon --stop\n");
 
       return 1;
