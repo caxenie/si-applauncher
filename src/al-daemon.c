@@ -1403,7 +1403,8 @@ void AlReplyToMethodCall(DBusMessage * p_msg, DBusConnection * p_conn)
 void AlListenToMethodCall()
 {
   /* define message and reply */
-  DBusMessage *l_msg_methods, *l_msg_signals, *l_reply;
+  DBusMessage *l_msg_methods, *l_msg_signals, *l_reply, *l_msg_notif,
+      *l_reply_notif;
   /* define connection for default method calls and notification signals */
   DBusConnection *l_conn, *l_conn_sig;
   /* error definition */
@@ -1510,6 +1511,44 @@ void AlListenToMethodCall()
 
     dbus_error_free(&l_err);
   }
+
+  /* subscribe to systemd to receive state change notifications */
+  if (!
+      (l_msg_notif =
+       dbus_message_new_method_call("org.freedesktop.systemd1",
+				    "/org/freedesktop/systemd1",
+				    "org.freedesktop.systemd1.Manager",
+				    "Subscribe"))) {
+    log_message
+	("AL Daemon Method Call Listener : Could not allocate message when subscribing to systemd! \n %s \n",
+	 l_err.message);
+
+    if (l_msg_notif)
+      dbus_message_unref(l_msg_notif);
+
+    if (l_reply_notif)
+      dbus_message_unref(l_reply_notif);
+
+    dbus_error_free(&l_err);
+  }
+
+  if (!
+      (l_reply_notif =
+       dbus_connection_send_with_reply_and_block(l_conn_sig, l_msg_notif,
+						 -1, &l_err))) {
+    log_message
+	("AL Daemon Method Call Listener : Failed to issue method call: %s \n",
+	 l_err.message);
+
+    if (l_msg_notif)
+      dbus_message_unref(l_msg_notif);
+
+    if (l_reply_notif)
+      dbus_message_unref(l_reply_notif);
+
+    dbus_error_free(&l_err);
+  }
+
   /* loop, testing for new messages */
   while (true) {
     /* non blocking read of the next available message */
@@ -1811,6 +1850,7 @@ void AlListenToMethodCall()
       Suspend((int) AppPidFromName(l_app));
 
     }
+
 
     /* wait for messages on the signal dedicated connection */
     if (NULL == l_msg_signals) {
