@@ -25,6 +25,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <getopt.h>
 #include <glib/gstdio.h>
 #include <glib.h>
 #include <libgen.h>
@@ -40,6 +41,63 @@
 #include <sys/user.h>
 #include <unistd.h>
 #include "al-daemon.h"
+
+/* Function responsible with the command line interface output */
+void AlPrintCLI(){
+	fprintf(stdout,
+	      "Syntax: \n"
+	      "   al-daemon --start|-S options \n"
+	      "   al-daemon --stop|-K\n"
+	      "   al-daemon --version|-V\n"
+	      "   al-daemon --help|-H\n"
+	      "\n"
+ 	      "Options: \n"
+	      "   --verbose|-v   prints the internal daemon log messages\n");
+}
+
+/* Function responsible with command line options parsing */
+void AlParseCLIOptions(int argc, char* const *argv){
+
+	static struct option l_long_opts[] = {
+		{ "start",	0, NULL, 'S'},
+		{ "stop",	0, NULL, 'K'},
+		{ "help",	0, NULL, 'H'},
+		{ "version",	0, NULL, 'V'},
+		{ "verbose", 	0, NULL, 'v'},
+		{ NULL,		0, NULL,  0}
+	};
+
+	int l_op;
+
+	while(1){
+		l_op = getopt_long(argc, argv, "HKSV:v:", l_long_opts, (int*) 0);
+
+	if(l_op==-1)
+		break;
+	switch(l_op){
+		case 'H': /* printf the help */
+			AlPrintCLI();
+			return 1;
+		case 'K': /* kill the daemon */
+			g_stop = 1;
+			break;
+		case 'S': /* start the daemon */
+			g_start = 1;
+			break;
+		case 'V': /* print version */
+			fprintf(stdout, "\nAL Daemon version %s\n", AL_VERSION);
+			exit(0);
+		case 'v': /* enable verbose */
+			g_verbose = 1;
+			break;
+
+		default:
+			AlPrintCLI();
+			return 1;
+		}
+       }
+}
+
 
 /* Function to extract PID value using the name of an application */
 pid_t AppPidFromName(char *p_app_name)
@@ -2027,54 +2085,16 @@ int main(int argc, char **argv)
   // TODO add specific init calls here if needed
 
   /* main daemon loop */
-  while (1) {
+  AlParseCLIOptions(argc, argv);
+  
+  if(g_stop){
+	system("killall -9 al-daemon");	
+        fprintf(stdout, "AL Daemon : Daemon process was finished !\n");
+	return 0;
+	}
 
-    if (2 > argc) {
-      fprintf(stdout,
-	      "Syntax: al-daemon --start [--verbose|-v] [--version|-V]\n"
-	      "\tal-daemon --stop\n");
-      fprintf(stdout, "\nAL Daemon version %s\n", AL_VERSION);
-      return 1;
-    }
-    if (0 == strcmp(argv[1], "--start")) {
-      if (argc == 3) {
-	if ((0 == strcmp(argv[2], "--verbose"))
-	    || (0 == strcmp(argv[2], "-v"))) {
-	  g_verbose = 1;
+  if(g_start){
+	AlListenToMethodCall();
 	}
-	if ((0 == strcmp(argv[2], "--version"))
-	    || (0 == strcmp(argv[2], "-V"))) {
-	  fprintf(stdout, "\nAL Daemon version %s\n", AL_VERSION);
-	}
-      }
-      if (argc == 4) {
-	if ((0 == strcmp(argv[2], "--verbose"))
-	    || (0 == strcmp(argv[2], "-v"))) {
-	  g_verbose = 1;
-	}
-	if ((0 == strcmp(argv[3], "--version"))
-	    || (0 == strcmp(argv[3], "-V"))) {
-	  fprintf(stdout, "\nAL Daemon version %s\n", AL_VERSION);
-	}
-	if ((0 == strcmp(argv[3], "--verbose"))
-	    || (0 == strcmp(argv[3], "-v"))) {
-	  g_verbose = 1;
-	}
-	if ((0 == strcmp(argv[2], "--version"))
-	    || (0 == strcmp(argv[2], "-V"))) {
-	  fprintf(stdout, "\nAL Daemon version %s\n", AL_VERSION);
-	}
-      }
-      AlListenToMethodCall();
-    } else if (0 == strcmp(argv[1], "--stop")) {
-      system("killall -9 al-daemon");
-    } else {
-      fprintf(stdout,
-	      "Syntax: al-daemon --start [--verbose|-v] [--version|-V]\n"
-	      "\tal-daemon --stop\n");
-
-      return 1;
-    }
-  }
   return 0;
 }

@@ -39,6 +39,10 @@
 
 /* Tracing support */
 unsigned char g_verbose = 0;
+/* CLI commands */
+unsigned char g_stop = 0;
+unsigned char g_start = 0;
+/* macro for logging */
 #define log_message(format,args...) \
 			do{ \
 			    if(g_verbose) \
