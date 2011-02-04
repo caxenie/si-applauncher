@@ -43,61 +43,62 @@
 #include "al-daemon.h"
 
 /* Function responsible with the command line interface output */
-void AlPrintCLI(){
-	fprintf(stdout,
-	      "Syntax: \n"
-	      "   al-daemon --start|-S options \n"
-	      "   al-daemon --stop|-K\n"
-	      "   al-daemon --version|-V\n"
-	      "   al-daemon --help|-H\n"
-	      "\n"
- 	      "Options: \n"
-	      "   --verbose|-v   prints the internal daemon log messages\n");
+void AlPrintCLI()
+{
+  fprintf(stdout,
+	  "Syntax: \n"
+	  "   al-daemon --start|-S options \n"
+	  "   al-daemon --stop|-K\n"
+	  "   al-daemon --version|-V\n"
+	  "   al-daemon --help|-H\n"
+	  "\n"
+	  "Options: \n"
+	  "   --verbose|-v   prints the internal daemon log messages\n");
 }
 
 /* Function responsible with command line options parsing */
-void AlParseCLIOptions(int argc, char* const *argv){
+void AlParseCLIOptions(int argc, char *const *argv)
+{
+  /* accepted commnad line options */
+  static struct option l_long_opts[] = {
+    {"start", 0, NULL, 'S'},
+    {"stop", 0, NULL, 'K'},
+    {"help", 0, NULL, 'H'},
+    {"version", 0, NULL, 'V'},
+    {"verbose", 0, NULL, 'v'},
+    {NULL, 0, NULL, 0}
+  };
 
-	static struct option l_long_opts[] = {
-		{ "start",	0, NULL, 'S'},
-		{ "stop",	0, NULL, 'K'},
-		{ "help",	0, NULL, 'H'},
-		{ "version",	0, NULL, 'V'},
-		{ "verbose", 	0, NULL, 'v'},
-		{ NULL,		0, NULL,  0}
-	};
+  int l_op;
+  /* option parsing */
+  while (1) {
+    l_op = getopt_long(argc, argv, "HKSVv", l_long_opts, (int *) 0);
 
-	int l_op;
-
-	while(1){
-		l_op = getopt_long(argc, argv, "HKSVv", l_long_opts, (int*) 0);
-
-	if(l_op==-1)
-		break;
-	switch(l_op){
-		case 'H': /* printf the help */
-			AlPrintCLI();
-			return 1;
-		case 'K': /* kill the daemon */
-			g_stop = 1;
-			break;
-		case 'S': /* start the daemon */
-			g_start = 1;
-			break;
-		case 'V': /* print version */
-			fprintf(stdout, "\nAL Daemon version %s\n", AL_VERSION);
-			exit(0);
-		case 'v': /* enable verbose */
-			g_verbose = 1;
-			break;
-
-		default:
-			AlPrintCLI();
-			return 1;
-		}
-       }
-	if(argc < 2)
-		AlPrintCLI();
+    if (l_op == -1)
+      break;
+    switch (l_op) {
+    case 'H':			/* printf the help */
+      AlPrintCLI();
+      return;
+    case 'K':			/* kill the daemon */
+      g_stop = 1;
+      break;
+    case 'S':			/* start the daemon */
+      g_start = 1;
+      break;
+    case 'V':			/* print version */
+      fprintf(stdout, "\nAL Daemon version %s\n", AL_VERSION);
+      exit(0);
+    case 'v':			/* enable verbose */
+      g_verbose = 1;
+      break;
+    default:
+      AlPrintCLI();
+      return;
+    }
+  }
+  if (argc < 2)
+    AlPrintCLI();
 }
 
 /* Function to extract PID value using the name of an application */
@@ -778,7 +779,7 @@ free_res:
  * or an application already running in the system. 
  */
 
-void AlAppStateNotifier(DBusConnection *p_conn, char *p_app_name)
+void AlAppStateNotifier(DBusConnection * p_conn, char *p_app_name)
 {
 
   /* message to be sent */
@@ -1015,7 +1016,7 @@ void TaskStopped(char *p_imagePath, int p_pid)
 
 
 /* Connect to the DBUS bus and send a broadcast signal about the state of the application */
-void AlSendAppSignal(DBusConnection *p_conn, char *p_app_name)
+void AlSendAppSignal(DBusConnection * p_conn, char *p_app_name)
 {
   /* message to be sent */
   DBusMessage *l_msg, *l_reply;
@@ -1389,10 +1390,9 @@ void AlReplyToMethodCall(DBusMessage * p_msg, DBusConnection * p_conn)
 void AlListenToMethodCall()
 {
   /* define message and reply */
-  DBusMessage *l_msg_methods, *l_msg_signals, *l_reply, *l_msg_notif,
-      *l_reply_notif;
+  DBusMessage *l_msg, *l_reply, *l_msg_notif, *l_reply_notif;
   /* define connection for default method calls and notification signals */
-  DBusConnection *l_conn, *l_conn_sig;
+  DBusConnection *l_conn;
   /* error definition */
   DBusError l_err;
   /* return code */
@@ -1445,21 +1445,9 @@ void AlListenToMethodCall()
 	 l_ret);
     return;
   }
-  /* connect to the bus to listen for signals and check for errors */
-  l_conn_sig = dbus_bus_get(DBUS_BUS_SYSTEM, &l_err);
-  if (dbus_error_is_set(&l_err)) {
-    log_message
-	("AL Daemon Method Call Listener : Connection Error (%s)\n",
-	 l_err.message);
-    dbus_error_free(&l_err);
-  }
-  if (NULL == l_conn_sig) {
-    log_message("AL Daemon Method Call Listener : Connection Null!%s",
-		"\n");
-    return;
-  }
+
   /* add matcher for notification on property change signals */
-  dbus_bus_add_match(l_conn_sig,
+  dbus_bus_add_match(l_conn,
 		     "type='signal',"
 		     "sender='org.freedesktop.systemd1',"
 		     "interface='org.freedesktop.DBus.Properties',"
@@ -1468,14 +1456,10 @@ void AlListenToMethodCall()
     log_message
 	("AL Daemon Method Call Listener : Failed to add signal matcher: %s\n",
 	 l_err.message);
-
-    if (l_msg_methods)
-      dbus_message_unref(l_msg_methods);
-
-    if (l_msg_signals)
-      dbus_message_unref(l_msg_signals);
-
-
+    if (l_msg)
+      dbus_message_unref(l_msg);
+    if (l_msg)
+      dbus_message_unref(l_msg);
     dbus_error_free(&l_err);
   }
   /* add matcher for method calls */
@@ -1487,14 +1471,10 @@ void AlListenToMethodCall()
     log_message
 	("AL Daemon Method Call Listener : Failed to add method call matcher: %s\n",
 	 l_err.message);
-
-    if (l_msg_methods)
-      dbus_message_unref(l_msg_methods);
-
-    if (l_msg_signals)
-      dbus_message_unref(l_msg_signals);
-
-
+    if (l_msg)
+      dbus_message_unref(l_msg);
+    if (l_msg)
+      dbus_message_unref(l_msg);
     dbus_error_free(&l_err);
   }
 
@@ -1508,30 +1488,24 @@ void AlListenToMethodCall()
     log_message
 	("AL Daemon Method Call Listener : Could not allocate message when subscribing to systemd! \n %s \n",
 	 l_err.message);
-
     if (l_msg_notif)
       dbus_message_unref(l_msg_notif);
-
     if (l_reply_notif)
       dbus_message_unref(l_reply_notif);
-
     dbus_error_free(&l_err);
   }
 
   if (!
       (l_reply_notif =
-       dbus_connection_send_with_reply_and_block(l_conn_sig, l_msg_notif,
+       dbus_connection_send_with_reply_and_block(l_conn, l_msg_notif,
 						 -1, &l_err))) {
     log_message
 	("AL Daemon Method Call Listener : Failed to issue method call: %s \n",
 	 l_err.message);
-
     if (l_msg_notif)
       dbus_message_unref(l_msg_notif);
-
     if (l_reply_notif)
       dbus_message_unref(l_reply_notif);
-
     dbus_error_free(&l_err);
   }
 
@@ -1539,22 +1513,19 @@ void AlListenToMethodCall()
   while (true) {
     /* non blocking read of the next available message */
     dbus_connection_read_write(l_conn, 0);
-    dbus_connection_read_write(l_conn_sig, 0);
-    l_msg_methods = dbus_connection_pop_message(l_conn);
-    l_msg_signals = dbus_connection_pop_message(l_conn_sig);
+    l_msg = dbus_connection_pop_message(l_conn);
 
     /* loop again if we haven't got a message */
-    if ((NULL == l_msg_methods) && (NULL == l_msg_signals)) {
+    if (NULL == l_msg) {
       sleep(1);
       continue;
     }
 
     /* check if this is a method call for the right interface amd method */
-    if (dbus_message_is_method_call
-	(l_msg_methods, AL_METHOD_INTERFACE, "Run")) {
-      AlReplyToMethodCall(l_msg_methods, l_conn);
+    if (dbus_message_is_method_call(l_msg, AL_METHOD_INTERFACE, "Run")) {
+      AlReplyToMethodCall(l_msg, l_conn);
       /* extract application name and arguments */
-      dbus_message_get_args(l_msg_methods, &l_err, DBUS_TYPE_STRING,
+      dbus_message_get_args(l_msg, &l_err, DBUS_TYPE_STRING,
 			    &l_app, DBUS_TYPE_STRING, &l_app_args,
 			    DBUS_TYPE_INVALID);
       log_message("AL Daemon Method Call Listener : Run app: %s\n", l_app);
@@ -1609,14 +1580,13 @@ void AlListenToMethodCall()
       }
       /* run the application */
       Run(true, 0, l_app);
-
     }
+
     /* check if this is a method call for the right interface amd method */
-    if (dbus_message_is_method_call
-	(l_msg_methods, AL_METHOD_INTERFACE, "RunAs")) {
-      AlReplyToMethodCall(l_msg_methods, l_conn);
+    if (dbus_message_is_method_call(l_msg, AL_METHOD_INTERFACE, "RunAs")) {
+      AlReplyToMethodCall(l_msg, l_conn);
       /* extract application name and arguments */
-      dbus_message_get_args(l_msg_methods, &l_err, DBUS_TYPE_STRING,
+      dbus_message_get_args(l_msg, &l_err, DBUS_TYPE_STRING,
 			    &l_app, DBUS_TYPE_STRING, &l_app_args,
 			    DBUS_TYPE_INVALID);
       /* if reboot / shutdown unit add deferred functionality in timer file */
@@ -1671,14 +1641,13 @@ void AlListenToMethodCall()
       }
       /* runas the application */
       RunAs(0, 0, true, 0, l_app);
-
     }
+
     /* check if this is a method call for the right interface amd method */
-    if (dbus_message_is_method_call
-	(l_msg_methods, AL_METHOD_INTERFACE, "Stop")) {
-      AlReplyToMethodCall(l_msg_methods, l_conn);
+    if (dbus_message_is_method_call(l_msg, AL_METHOD_INTERFACE, "Stop")) {
+      AlReplyToMethodCall(l_msg, l_conn);
       /* extract application name */
-      dbus_message_get_args(l_msg_methods, &l_err, DBUS_TYPE_STRING,
+      dbus_message_get_args(l_msg, &l_err, DBUS_TYPE_STRING,
 			    &l_app, DBUS_TYPE_INVALID);
       log_message
 	  ("AL Daemon Method Call Listener : Stopping application %s\n",
@@ -1725,14 +1694,13 @@ void AlListenToMethodCall()
       }
       /* stop the application */
       Stop(0, 0, (int) AppPidFromName(l_app));
-
     }
+
     /* check if this is a method call for the right interface amd method */
-    if (dbus_message_is_method_call
-	(l_msg_methods, AL_METHOD_INTERFACE, "Resume")) {
-      AlReplyToMethodCall(l_msg_methods, l_conn);
+    if (dbus_message_is_method_call(l_msg, AL_METHOD_INTERFACE, "Resume")) {
+      AlReplyToMethodCall(l_msg, l_conn);
       /* extract the application name */
-      dbus_message_get_args(l_msg_methods, &l_err, DBUS_TYPE_STRING,
+      dbus_message_get_args(l_msg, &l_err, DBUS_TYPE_STRING,
 			    &l_app, DBUS_TYPE_INVALID);
       log_message
 	  ("AL Daemon Method Call Listener : Resuming application %s\n",
@@ -1783,11 +1751,10 @@ void AlListenToMethodCall()
     }
 
     /* check if this is a method call for the right interface amd method */
-    if (dbus_message_is_method_call
-	(l_msg_methods, AL_METHOD_INTERFACE, "Suspend")) {
-      AlReplyToMethodCall(l_msg_methods, l_conn);
+    if (dbus_message_is_method_call(l_msg, AL_METHOD_INTERFACE, "Suspend")) {
+      AlReplyToMethodCall(l_msg, l_conn);
       /* extract the application name */
-      dbus_message_get_args(l_msg_methods, &l_err, DBUS_TYPE_STRING,
+      dbus_message_get_args(l_msg, &l_err, DBUS_TYPE_STRING,
 			    &l_app, DBUS_TYPE_INVALID);
       log_message
 	  ("AL Daemon Method Call Listener : Suspending application %s\n",
@@ -1834,20 +1801,11 @@ void AlListenToMethodCall()
       }
       /* suspend the application */
       Suspend((int) AppPidFromName(l_app));
-
-    }
-
-
-    /* wait for messages on the signal dedicated connection */
-    if (NULL == l_msg_signals) {
-      sleep(1);
-      continue;
     }
 
     /* consider only property change notification signals */
     if (dbus_message_is_signal
-	(l_msg_signals, "org.freedesktop.DBus.Properties",
-	 "PropertiesChanged")) {
+	(l_msg, "org.freedesktop.DBus.Properties", "PropertiesChanged")) {
       /* handling variables for object path, interface and property */
       const char *l_path, *l_interface, *l_property = "Id";
       /* initialize reply iterators */
@@ -1857,66 +1815,70 @@ void AlListenToMethodCall()
 	  ("AL Daemon Signal Listener : An application changed state !%s",
 	   "\n");
       /* get object path for message */
-      l_path = dbus_message_get_path(l_msg_signals);
+      l_path = dbus_message_get_path(l_msg);
+
       /* extract the interface name from message */
-      if (!dbus_message_get_args(l_msg_signals, &l_err,
+      if (!dbus_message_get_args(l_msg, &l_err,
 				 DBUS_TYPE_STRING, &l_interface,
 				 DBUS_TYPE_INVALID)) {
 	log_message
 	    ("AL Daemon Method Call Listener : Failed to parse message: %s",
 	     l_err.message);
-	if (l_msg_signals)
-	  dbus_message_unref(l_msg_signals);
+	if (l_msg)
+	  dbus_message_unref(l_msg);
 
 	dbus_error_free(&l_err);
 	continue;
       }
-      /* filter only the unit specific interface */
-      if (strcmp(l_interface, "org.freedesktop.systemd1.Unit") != 0) {
-	if (l_msg_signals)
+
+      /* filter only the unit and service specific interfaces */
+      if ((strcmp(l_interface, "org.freedesktop.systemd1.Unit") != 0)
+	  && (strcmp(l_interface, "org.freedesktop.systemd1.Service") !=
+	      0)) {
+	if (l_msg)
 	  /* free the message */
-	  dbus_message_unref(l_msg_signals);
+	  dbus_message_unref(l_msg);
 	dbus_error_free(&l_err);
 	return;
       }
+
       /* new method call to get unit properties */
       if (!
-	  (l_msg_signals =
+	  (l_msg =
 	   dbus_message_new_method_call("org.freedesktop.systemd1", l_path,
 					"org.freedesktop.DBus.Properties",
 					"Get"))) {
 	log_message
 	    ("AL Daemon Method Call Listener : Could not allocate message for %s !\n",
 	     l_path);
-	if (l_msg_signals)
-	  dbus_message_unref(l_msg_signals);
+	if (l_msg)
+	  dbus_message_unref(l_msg);
 	dbus_error_free(&l_err);
 	continue;
       }
       /* append arguments for the message */
-      if (!dbus_message_append_args(l_msg_signals,
+      if (!dbus_message_append_args(l_msg,
 				    DBUS_TYPE_STRING, &l_interface,
 				    DBUS_TYPE_STRING, &l_property,
 				    DBUS_TYPE_INVALID)) {
 	log_message
 	    ("AL Daemon Method Call Listener : Could not append arguments to message for %s !\n",
 	     l_path);
-	if (l_msg_signals)
-	  dbus_message_unref(l_msg_signals);
+	if (l_msg)
+	  dbus_message_unref(l_msg);
 	dbus_error_free(&l_err);
 	continue;
       }
       /* send the message and wait for a reply */
       if (!
 	  (l_reply =
-	   dbus_connection_send_with_reply_and_block(l_conn_sig,
-						     l_msg_signals, -1,
-						     &l_err))) {
+	   dbus_connection_send_with_reply_and_block(l_conn,
+						     l_msg, -1, &l_err))) {
 	log_message
 	    ("AL Daemon Signal Listener : Failed to issue method call: %s",
 	     l_err.message);
-	if (l_msg_signals)
-	  dbus_message_unref(l_msg_signals);
+	if (l_msg)
+	  dbus_message_unref(l_msg);
 	if (l_reply)
 	  dbus_message_unref(l_reply);
 	dbus_error_free(&l_err);
@@ -1928,8 +1890,8 @@ void AlListenToMethodCall()
 	log_message
 	    ("AL Daemon Signal Call Listener : Failed to parse reply for %s !\n",
 	     l_path);
-	if (l_msg_signals)
-	  dbus_message_unref(l_msg_signals);
+	if (l_msg)
+	  dbus_message_unref(l_msg);
 	if (l_reply)
 	  dbus_message_unref(l_reply);
 	dbus_error_free(&l_err);
@@ -1946,8 +1908,8 @@ void AlListenToMethodCall()
 	  log_message
 	      ("AL Daemon Method Call Listener : Failed to parse reply for %s !",
 	       l_path);
-	  if (l_msg_signals)
-	    dbus_message_unref(l_msg_signals);
+	  if (l_msg)
+	    dbus_message_unref(l_msg);
 	  if (l_reply)
 	    dbus_message_unref(l_reply);
 	  dbus_error_free(&l_err);
@@ -1958,16 +1920,15 @@ void AlListenToMethodCall()
 	log_message("AL Daemon Method Call Listener : Unit %s changed.\n",
 		    l_id);
 	/* notify clients about tasks global state changes */
-	AlAppStateNotifier(l_conn_sig, (char *) l_id);
+	AlAppStateNotifier(l_conn, (char *) l_id);
 	/* notify about task started/stopped */
-	AlSendAppSignal(l_conn_sig, (char *) l_id);
+	AlSendAppSignal(l_conn, (char *) l_id);
       }
     }
   }
-  /* free the message */
-  dbus_message_unref(l_msg_methods);
-  dbus_message_unref(l_msg_signals);
-
+  /* free the messages */
+  dbus_message_unref(l_msg);
+  dbus_message_unref(l_msg_notif);
 }
 
 /* application launcher daemon entrypoint */
@@ -2013,19 +1974,19 @@ int main(int argc, char **argv)
   /* specific initialization code */
   // TODO add specific init calls here if needed
 
-  /* main daemon loop */ 
+  /* main daemon loop */
   AlParseCLIOptions(argc, argv);
-  
-  if(g_stop){
- 	fprintf(stdout, "AL Daemon : Daemon process was stopped !\n");
-	system("killall -9 al-daemon");	
-	return 0;
-	}
 
-  if(g_start){
-	fprintf(stdout, "AL Daemon : Daemon process was started !\n");
-	AlListenToMethodCall();
-	}
+  if (g_stop) {
+    fprintf(stdout, "AL Daemon : Daemon process was stopped !\n");
+    system("killall -9 al-daemon");
+    return 0;
+  }
+
+  if (g_start) {
+    fprintf(stdout, "AL Daemon : Daemon process was started !\n");
+    AlListenToMethodCall();
+  }
 
   return 0;
 }
