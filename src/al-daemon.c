@@ -77,7 +77,7 @@ void AlParseCLIOptions(int argc, char* const *argv){
 	switch(l_op){
 		case 'H': /* printf the help */
 			AlPrintCLI();
-			exit(EXIT_SUCCESS);
+			return 1;
 		case 'K': /* kill the daemon */
 			g_stop = 1;
 			break;
@@ -93,13 +93,12 @@ void AlParseCLIOptions(int argc, char* const *argv){
 
 		default:
 			AlPrintCLI();
-			exit(EXIT_SUCCESS);
+			return 1;
 		}
        }
 	if(argc < 2)
 		AlPrintCLI();
 }
-
 
 /* Function to extract PID value using the name of an application */
 pid_t AppPidFromName(char *p_app_name)
@@ -779,17 +778,13 @@ free_res:
  * or an application already running in the system. 
  */
 
-void AlAppStateNotifier(char *p_app_name)
+void AlAppStateNotifier(DBusConnection *p_conn, char *p_app_name)
 {
 
   /* message to be sent */
   DBusMessage *l_msg;
   /* message arguments */
   DBusMessageIter l_args;
-  /* connection to the bus */
-  DBusConnection *l_conn;
-  /* error */
-  DBusError l_err;
   /* return code */
   int l_ret;
   /* reply information */
@@ -802,39 +797,6 @@ void AlAppStateNotifier(char *p_app_name)
       ("AL Daemon Send Notification : Sending signal with value %s\n",
        p_app_name);
 
-  /* initialise the error value */
-  dbus_error_init(&l_err);
-
-  /* connect to the DBUS system bus, and check for errors */
-  l_conn = dbus_bus_get(DBUS_BUS_SYSTEM, &l_err);
-  if (dbus_error_is_set(&l_err)) {
-    log_message("AL Daemon Send Notification : Connection Error (%s)\n",
-		l_err.message);
-    dbus_error_free(&l_err);
-  }
-  if (NULL == l_conn) {
-    return;
-  }
-  /* register the name on the bus, and check for errors */
-  l_ret =
-      dbus_bus_request_name(l_conn, AL_SIG_TRIGGER,
-			    DBUS_NAME_FLAG_REPLACE_EXISTING, &l_err);
-  if (dbus_error_is_set(&l_err)) {
-    log_message("AL Daemon Send Notification : Name Error (%s)\n",
-		l_err.message);
-    dbus_error_free(&l_err);
-  }
-  /* check for primary owner on the request */
-  if (DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER != l_ret) {
-    if (DBUS_REQUEST_NAME_REPLY_ALREADY_OWNER != l_ret) {
-      return;
-    }
-  }
-
-  log_message
-      ("AL Daemon Send Notification : Checked primary owner for %s\n",
-       p_app_name);
-
   /* extract the information to broadcast */
   log_message
       ("AL Daemon Send Notification : Getting application state for %s \n",
@@ -842,7 +804,7 @@ void AlAppStateNotifier(char *p_app_name)
 
 
   /* extract the application state  */
-  if (AlGetAppState(l_conn, p_app_name, l_state_info) == 0) {
+  if (AlGetAppState(p_conn, p_app_name, l_state_info) == 0) {
 
     log_message
 	("AL Daemon Send Notification : Received application state for %s \n",
@@ -888,7 +850,7 @@ void AlAppStateNotifier(char *p_app_name)
 	 p_app_name);
 
     /* send the message and flush the connection */
-    if (!dbus_connection_send(l_conn, l_msg, &l_serial)) {
+    if (!dbus_connection_send(p_conn, l_msg, &l_serial)) {
       log_message
 	  ("AL Daemon Send Notification for %s: Connection Out Of Memory!\n",
 	   p_app_name);
@@ -899,8 +861,6 @@ void AlAppStateNotifier(char *p_app_name)
   }
   /* free the message */
   dbus_message_unref(l_msg);
-  /* free the error */
-  dbus_error_free(&l_err);
 }
 
 
@@ -1055,14 +1015,12 @@ void TaskStopped(char *p_imagePath, int p_pid)
 
 
 /* Connect to the DBUS bus and send a broadcast signal about the state of the application */
-void AlSendAppSignal(char *p_app_name)
+void AlSendAppSignal(DBusConnection *p_conn, char *p_app_name)
 {
   /* message to be sent */
   DBusMessage *l_msg, *l_reply;
   /* message arguments */
   DBusMessageIter l_args;
-  /* connection to the bus */
-  DBusConnection *l_conn;
   /* error */
   DBusError l_err;
   /* return code */
@@ -1101,38 +1059,6 @@ void AlSendAppSignal(char *p_app_name)
   /* initialise the error value */
   dbus_error_init(&l_err);
 
-  /* connect to the DBUS system bus, and check for errors */
-  l_conn = dbus_bus_get(DBUS_BUS_SYSTEM, &l_err);
-  if (dbus_error_is_set(&l_err)) {
-    log_message
-	("AL Daemon Send Active State Notification : Connection Error (%s)\n",
-	 l_err.message);
-    dbus_error_free(&l_err);
-  }
-  if (NULL == l_conn) {
-    return;
-  }
-  /* register the name on the bus, and check for errors */
-  l_ret =
-      dbus_bus_request_name(l_conn, AL_SIG_TRIGGER,
-			    DBUS_NAME_FLAG_REPLACE_EXISTING, &l_err);
-  if (dbus_error_is_set(&l_err)) {
-    log_message
-	("AL Daemon Send Active State Notification : Name Error (%s)\n",
-	 l_err.message);
-    dbus_error_free(&l_err);
-  }
-  /* check for primary owner on the request */
-  if (DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER != l_ret) {
-    if (DBUS_REQUEST_NAME_REPLY_ALREADY_OWNER != l_ret) {
-      return;
-    }
-  }
-
-  log_message
-      ("AL Daemon Send Active State Notification : Checked primary owner for %s\n",
-       p_app_name);
-
   /* extract the information to broadcast */
   log_message
       ("AL Daemon Send Active State Notification : Getting application state for %s \n",
@@ -1162,7 +1088,7 @@ void AlSendAppSignal(char *p_app_name)
   }
   /* send the message on the bus and wait for a reply */
   if (!(l_reply =
-	dbus_connection_send_with_reply_and_block(l_conn, l_msg, -1,
+	dbus_connection_send_with_reply_and_block(p_conn, l_msg, -1,
 						  &l_err))) {
     log_message
 	("AL Daemon Send Active State Notification : Unknown information for %s \n",
@@ -1210,7 +1136,7 @@ void AlSendAppSignal(char *p_app_name)
   dbus_message_unref(l_reply);
   /* send the message over the systemd bus and wait for a reply */
   if (!(l_reply =
-	dbus_connection_send_with_reply_and_block(l_conn, l_msg, -1,
+	dbus_connection_send_with_reply_and_block(p_conn, l_msg, -1,
 						  &l_err))) {
     log_message
 	("AL Daemon Send Active State Notification : Failed to issue method call for %s\n",
@@ -1247,7 +1173,7 @@ void AlSendAppSignal(char *p_app_name)
   dbus_message_unref(l_msg);
 
   /* extract the application state  */
-  if (AlGetAppState(l_conn, p_app_name, l_state_info) == 0) {
+  if (AlGetAppState(p_conn, p_app_name, l_state_info) == 0) {
 
     log_message
 	("AL Daemon Send Active State Notification : Received application state for %s \n",
@@ -1375,7 +1301,7 @@ void AlSendAppSignal(char *p_app_name)
     }
 
     /* send the message and flush the connection */
-    if (!dbus_connection_send(l_conn, l_msg, &l_serial)) {
+    if (!dbus_connection_send(p_conn, l_msg, &l_serial)) {
       log_message
 	  ("AL Daemon Send Active State Notification : for %s: Connection Out Of Memory!\n",
 	   p_app_name);
@@ -2032,9 +1958,9 @@ void AlListenToMethodCall()
 	log_message("AL Daemon Method Call Listener : Unit %s changed.\n",
 		    l_id);
 	/* notify clients about tasks global state changes */
-	AlAppStateNotifier((char *) l_id);
+	AlAppStateNotifier(l_conn_sig, (char *) l_id);
 	/* notify about task started/stopped */
-	AlSendAppSignal((char *) l_id);
+	AlSendAppSignal(l_conn_sig, (char *) l_id);
       }
     }
   }

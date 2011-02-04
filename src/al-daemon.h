@@ -64,7 +64,7 @@ extern void Stop(int egid, int euid, int pid);
 extern void TaskStarted(char *imagePath, int pid);
 extern void TaskStopped(char *imagePath, int pid);
 /* Connect to the DBUS bus and send a broadcast signal regarding application state */
-extern void AlSendAppSignal(char *name);
+extern void AlSendAppSignal(DBusConnection * bus, char *name);
 /* Receive the method calls and reply */
 extern void AlReplyToMethodCall(DBusMessage * msg, DBusConnection * conn);
 /* Server that exposes a method call and waits for it to be called */
@@ -77,7 +77,7 @@ extern void SetupUnitFileKey(char *file, char *key, char *val, char *unit);
 extern int AlGetAppState(DBusConnection * bus, char *app_name,
 			 char *state_info);
 /* Function responsible to broadcast the state of an application that started execution or an application already running in the system  */
-extern void AlAppStateNotifier(char *app_name);
+extern void AlAppStateNotifier(DBusConnection * bus, char *app_name);
 /* Function responsible to test if a given application exists in the system. */
 extern int AppExistsInSystem(char *app_name);
 #endif
