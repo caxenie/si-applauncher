@@ -70,14 +70,14 @@ void AlParseCLIOptions(int argc, char* const *argv){
 	int l_op;
 
 	while(1){
-		l_op = getopt_long(argc, argv, "HKSV:v:", l_long_opts, (int*) 0);
+		l_op = getopt_long(argc, argv, "HKSVv", l_long_opts, (int*) 0);
 
 	if(l_op==-1)
 		break;
 	switch(l_op){
 		case 'H': /* printf the help */
 			AlPrintCLI();
-			return 1;
+			exit(EXIT_SUCCESS);
 		case 'K': /* kill the daemon */
 			g_stop = 1;
 			break;
@@ -93,9 +93,11 @@ void AlParseCLIOptions(int argc, char* const *argv){
 
 		default:
 			AlPrintCLI();
-			return 1;
+			exit(EXIT_SUCCESS);
 		}
        }
+	if(argc < 2)
+		AlPrintCLI();
 }
 
 
@@ -2047,6 +2049,7 @@ int main(int argc, char **argv)
 {
   /* setup a PID and a SID for our AL Interface daemon */
   pid_t l_al_pid, l_al_sid;
+  int l_ret;
 
   /* fork off the parent process */
   l_al_pid = fork();
@@ -2084,17 +2087,19 @@ int main(int argc, char **argv)
   /* specific initialization code */
   // TODO add specific init calls here if needed
 
-  /* main daemon loop */
+  /* main daemon loop */ 
   AlParseCLIOptions(argc, argv);
   
   if(g_stop){
+ 	fprintf(stdout, "AL Daemon : Daemon process was stopped !\n");
 	system("killall -9 al-daemon");	
-        fprintf(stdout, "AL Daemon : Daemon process was finished !\n");
 	return 0;
 	}
 
   if(g_start){
+	fprintf(stdout, "AL Daemon : Daemon process was started !\n");
 	AlListenToMethodCall();
 	}
+
   return 0;
 }
