@@ -1471,7 +1471,6 @@ void AlListenToMethodCall()
 	 l_err.message);
     if (l_msg)
       dbus_message_unref(l_msg);
-    if (l_msg)
     dbus_error_free(&l_err);
   }
   /* add matcher for method calls */
@@ -1483,8 +1482,6 @@ void AlListenToMethodCall()
     log_message
 	("AL Daemon Method Call Listener : Failed to add method call matcher: %s\n",
 	 l_err.message);
-    if (l_msg)
-      dbus_message_unref(l_msg);
     if (l_msg)
       dbus_message_unref(l_msg);
     dbus_error_free(&l_err);
