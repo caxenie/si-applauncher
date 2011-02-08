@@ -52,7 +52,7 @@ unsigned char g_start = 0;
 /* Function to extract PID value using the name of an application */
 extern pid_t AppPidFromName(char *app_name);
 /* Find application name from PID */
-extern void AppNameFromPid(int pid, char *app_name);
+extern int AppNameFromPid(int pid, char *app_name);
 /* High level interface for the AL Daemon */
 extern void Run(bool isFg, int parentPID, char *commandLine);
 extern void RunAs(int egid, int euid, bool isFg, int parentPID,

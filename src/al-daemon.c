@@ -191,7 +191,7 @@ pid_t AppPidFromName(char *p_app_name)
 
 
 /* Find application name from PID */
-void AppNameFromPid(int p_pid, char *p_app_name)
+int AppNameFromPid(int p_pid, char *p_app_name)
 {
   /* file descriptor */
   FILE *l_fp;
@@ -218,6 +218,8 @@ void AppNameFromPid(int p_pid, char *p_app_name)
   /* open the cmdline to extract the name of app */
   l_fp = fopen(l_path, "r");
   /* extract the name pf the app */
+  if(l_fp == NULL)
+	return 0;
   fgets(l_line, sizeof(char) * DIM_MAX, l_fp);
   /* save the name in non-local var to avoid stack clear */
   /* extract the name from the absolute path  */
@@ -243,6 +245,7 @@ void AppNameFromPid(int p_pid, char *p_app_name)
   strcpy(p_app_name, l_aline);
   /* free the file descriptor */
   fclose(l_fp);
+  return 1;
 }
 
 /* 
@@ -864,7 +867,6 @@ void AlAppStateNotifier(DBusConnection * p_conn, char *p_app_name)
   dbus_message_unref(l_msg);
 }
 
-
 /* High level interface for the AL Daemon */
 void Run(bool p_isFg, int p_parentPID, char *p_commandLine)
 {
@@ -933,10 +935,11 @@ void Suspend(int p_pid)
   int l_ret;
   /* stores the application name */
   char l_app_name[DIM_MAX];
+
   /* command line for the application */
   char *l_commandLine;
   /* extract the application name from the pid */
-  AppNameFromPid(p_pid, l_app_name);
+  if(AppNameFromPid(p_pid, l_app_name)!=0){
   l_commandLine = l_app_name;
   char l_cmd[DIM_MAX];
   log_message("%s canceled with suspend !\n", l_commandLine);
@@ -949,7 +952,10 @@ void Suspend(int p_pid)
     log_message
 	("AL Daemon : Application cannot be suspended! Err:%s\n",
 	 strerror(errno));
-  }
+   }
+  }else{
+	log_message("AL Daemon : Application cannot be suspended because is already stopped !%s", "\n"); 
+ }
 }
 
 void Resume(int p_pid)
@@ -961,7 +967,7 @@ void Resume(int p_pid)
   /* command line for the application */
   char *l_commandLine;
   /* extract the application name from the pid */
-  AppNameFromPid(p_pid, l_app_name);
+  if(AppNameFromPid(p_pid, l_app_name)!=0){
   l_commandLine = l_app_name;
   char l_cmd[DIM_MAX];
   log_message("%s restarted with resume !\n", l_commandLine);
@@ -973,7 +979,10 @@ void Resume(int p_pid)
   if (l_ret == -1) {
     log_message("AL Daemon : Application cannot be resumed! Err:%s\n",
 		strerror(errno));
-  }
+    }
+   }else{
+	log_message("AL Daemon : Application cannot be resumed because is stopped !%s", "\n"); 
+ }
 }
 
 void Stop(int p_egid, int p_euid, int p_pid)
@@ -984,8 +993,7 @@ void Stop(int p_egid, int p_euid, int p_pid)
   char l_app_name[DIM_MAX];
   /* command line for the application */
   char *l_commandLine;
-  /* extract the application name from the pid */
-  AppNameFromPid(p_pid, l_app_name);
+  if(AppNameFromPid(p_pid, l_app_name)!=0){
   l_commandLine = l_app_name;
   char l_cmd[DIM_MAX];
   log_message("%s stopped with stop !\n", l_app_name);
@@ -994,10 +1002,13 @@ void Stop(int p_egid, int p_euid, int p_pid)
   /* call systemd */
   l_ret = system(l_cmd);
 
-  if (l_ret == -1) {
+  if (l_ret != 0) {
     log_message("AL Daemon : Application cannot be stopped! Err:%s\n",
 		strerror(errno));
-  }
+   }
+  }else{
+	log_message("AL Daemon : Application cannot be stopped because is already stopped !%s", "\n"); 
+ }
 }
 
 void TaskStarted(char *p_imagePath, int p_pid)
@@ -1459,7 +1470,6 @@ void AlListenToMethodCall()
     if (l_msg)
       dbus_message_unref(l_msg);
     if (l_msg)
-      dbus_message_unref(l_msg);
     dbus_error_free(&l_err);
   }
   /* add matcher for method calls */
@@ -1802,7 +1812,7 @@ void AlListenToMethodCall()
       /* suspend the application */
       Suspend((int) AppPidFromName(l_app));
     }
-
+    
     /* consider only property change notification signals */
     if (dbus_message_is_signal
 	(l_msg, "org.freedesktop.DBus.Properties", "PropertiesChanged")) {
@@ -1919,7 +1929,7 @@ void AlListenToMethodCall()
 	dbus_message_iter_get_basic(&l_sub_iter, &l_id);
 	log_message("AL Daemon Method Call Listener : Unit %s changed.\n",
 		    l_id);
-	/* notify clients about tasks global state changes */
+        /* notify clients about tasks global state changes */
 	AlAppStateNotifier(l_conn, (char *) l_id);
 	/* notify about task started/stopped */
 	AlSendAppSignal(l_conn, (char *) l_id);
