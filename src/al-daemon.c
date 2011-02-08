@@ -1025,6 +1025,25 @@ void TaskStopped(char *p_imagePath, int p_pid)
        p_pid, p_imagePath, AL_SIGNAME_TASK_STOPPED);
 }
 
+/* Function responsible with restarting an application when the SHM component detects
+ * an abnormal operation of the application
+ */
+void Restart(char *p_app_name)
+{
+  /* return code for system call */
+  int l_ret;
+  /* the command line for the application */
+  char l_cmd[DIM_MAX];
+  log_message("%s will be restarted !\n", p_app_name);
+  sprintf(l_cmd, "systemctl restart %s.service", p_app_name);
+  /* systemd invocation */
+  l_ret = system(l_cmd);
+  if (l_ret != 0) {
+    log_message
+	("AL Daemon : Application cannot be restarted with restart! Err: %s\n",
+	 strerror(errno));
+  }
+} 
 
 /* Connect to the DBUS bus and send a broadcast signal about the state of the application */
 void AlSendAppSignal(DBusConnection * p_conn, char *p_app_name)
@@ -1811,7 +1830,25 @@ void AlListenToMethodCall()
       /* suspend the application */
       Suspend((int) AppPidFromName(l_app));
     }
-    
+
+   /* check if this is a method call for the right interface amd method */
+    if (dbus_message_is_method_call(l_msg, AL_METHOD_INTERFACE, "Restart")) {
+      AlReplyToMethodCall(l_msg, l_conn);
+      /* extract application name and arguments */
+      dbus_message_get_args(l_msg, &l_err, DBUS_TYPE_STRING,
+			    &l_app, DBUS_TYPE_STRING, &l_app_args,
+			    DBUS_TYPE_INVALID);
+      log_message("AL Daemon Method Call Listener : Restart app: %s\n", l_app);
+      /* check for application service file existence */
+      if (!AppExistsInSystem(l_app)) {
+	log_message
+	    ("AL Daemon Method Call Listener : Cannot restart %s !\n Application %s is not found in the system !\n",
+	     l_app, l_app);
+	continue;
+      } 
+      Restart(l_app); 
+    }
+
     /* consider only property change notification signals */
     if (dbus_message_is_signal
 	(l_msg, "org.freedesktop.DBus.Properties", "PropertiesChanged")) {
@@ -1825,7 +1862,6 @@ void AlListenToMethodCall()
 	   "\n");
       /* get object path for message */
       l_path = dbus_message_get_path(l_msg);
-
       /* extract the interface name from message */
       if (!dbus_message_get_args(l_msg, &l_err,
 				 DBUS_TYPE_STRING, &l_interface,
@@ -1839,7 +1875,6 @@ void AlListenToMethodCall()
 	dbus_error_free(&l_err);
 	continue;
       }
-
       /* filter only the unit and service specific interfaces */
       if ((strcmp(l_interface, "org.freedesktop.systemd1.Unit") != 0)
 	  && (strcmp(l_interface, "org.freedesktop.systemd1.Service") !=
@@ -1848,7 +1883,7 @@ void AlListenToMethodCall()
 	  /* free the message */
 	  dbus_message_unref(l_msg);
 	dbus_error_free(&l_err);
-	return;
+	continue;
       }
 
       /* new method call to get unit properties */

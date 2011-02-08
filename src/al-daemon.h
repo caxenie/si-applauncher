@@ -80,4 +80,6 @@ extern int AlGetAppState(DBusConnection * bus, char *app_name,
 extern void AlAppStateNotifier(DBusConnection * bus, char *app_name);
 /* Function responsible to test if a given application exists in the system. */
 extern int AppExistsInSystem(char *app_name);
+    /* Function responsible with restarting an application when SHM detects an abnormal operation of the application */
+extern void Restart(char *app_name);
 #endif
