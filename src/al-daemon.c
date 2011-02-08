@@ -1452,9 +1452,11 @@ void AlListenToMethodCall()
   }
   if (DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER != l_ret) {
     log_message
-	("AL Daemon Method Call Listener : Not Primary Owner (%d)\n",
+	("AL Daemon Method Call Listener : Not Primary Owner (%d)! \n",
 	 l_ret);
-    return;
+    log_message
+	("AL Daemon : Daemon will be stopped !%s","\n");
+    system("killall -9 al-daemon");
   }
 
   /* add matcher for notification on property change signals */
