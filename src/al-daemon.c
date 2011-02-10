@@ -868,12 +868,14 @@ void AlAppStateNotifier(DBusConnection * p_conn, char *p_app_name)
 }
 
 /* High level interface for the AL Daemon */
-void Run(bool p_isFg, int p_parentPID, char *p_commandLine)
+void Run(int p_newPID, bool p_isFg, int p_parentPID, char *p_commandLine)
 {
   // TODO isFg and parentPID usage when starting applications
   // [out] newPID: INT32, isFg: BOOLEAN, parentPID: INT32, commandLine: STRING
   /* store the return code */
   int l_ret;
+  /* application PID */
+  int l_pid;
   log_message("%s started with run !\n", p_commandLine);
   /* the command line for the application */
   char l_cmd[DIM_MAX];
@@ -895,16 +897,23 @@ void Run(bool p_isFg, int p_parentPID, char *p_commandLine)
     log_message
 	("AL Daemon : Application cannot be started with run! Err: %s\n",
 	 strerror(errno));
+    return;
   }
+  /* extract the PID from the application name only if the start is valid */
+  l_pid = (int)AppPidFromName(p_commandLine);
+  p_newPID = l_pid;
+  log_message("%s was started with run and has PID : %d\n", p_commandLine, p_newPID);
 }
 
-void RunAs(int p_egid, int p_euid, bool p_isFg, int p_parentPID,
+void RunAs(int p_egid, int p_euid, int p_newPID, bool p_isFg, int p_parentPID,
 	   char *p_commandLine)
 {
   // TODO egid, euid, isFg and parentPID usage when starting applications 
   // egid: INT32, euid: INT32, [out] newPID: INT32, isFg: BOOLEAN, parentPID: INT32, commandLine: STRING
   /* store the return code */
   int l_ret;
+  /* application PID */
+  int l_pid;
   log_message("%s started with runas !\n", p_commandLine);
   /* the command line for the application */
   char l_cmd[DIM_MAX];
@@ -926,7 +935,12 @@ void RunAs(int p_egid, int p_euid, bool p_isFg, int p_parentPID,
     log_message
 	("AL Daemon : Application cannot be started with runas! Err: %s\n",
 	 strerror(errno));
+     return;
   }
+  /* extract the PID from the application name only if the start is valid */
+  l_pid = (int)AppPidFromName(p_commandLine);
+  p_newPID = l_pid;
+  log_message("%s was started with runas and has PID : %d\n", p_commandLine, p_newPID);
 }
 
 void Suspend(int p_pid)
@@ -1439,7 +1453,9 @@ void AlListenToMethodCall()
   char *l_sub_state = malloc(DIM_MAX * sizeof(l_sub_state));
   /* delimiters for service / application name extraction */
   char l_delim_serv[] = " ";
-
+  /* application PID */
+  int l_pid;
+  
   log_message
       ("AL Daemon Method Call Listener : Listening for method calls!%s",
        "\n");
@@ -1607,7 +1623,7 @@ void AlListenToMethodCall()
 	}
       }
       /* run the application */
-      Run(true, 0, l_app);
+      Run(l_pid, true, 0, l_app);
     }
 
     /* check if this is a method call for the right interface amd method */
@@ -1668,7 +1684,7 @@ void AlListenToMethodCall()
 	}
       }
       /* runas the application */
-      RunAs(0, 0, true, 0, l_app);
+      RunAs(0, 0, l_pid, true, 0, l_app);
     }
 
     /* check if this is a method call for the right interface amd method */

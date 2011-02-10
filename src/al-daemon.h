@@ -54,8 +54,8 @@ extern pid_t AppPidFromName(char *app_name);
 /* Find application name from PID */
 extern int AppNameFromPid(int pid, char *app_name);
 /* High level interface for the AL Daemon */
-extern void Run(bool isFg, int parentPID, char *commandLine);
-extern void RunAs(int egid, int euid, bool isFg, int parentPID,
+extern void Run(int newPID, bool isFg, int parentPID, char *commandLine);
+extern void RunAs(int egid, int euid, int newPID, bool isFg, int parentPID,
 		  char *commandLine);
 extern void Suspend(int pid);
 extern void Resume(int pid);
