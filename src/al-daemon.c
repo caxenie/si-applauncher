@@ -999,7 +999,7 @@ void Resume(int p_pid)
  }
 }
 
-void Stop(int p_egid, int p_euid, int p_pid)
+void Stop(int p_pid)
 {
   /* store the return code */
   int l_ret;
