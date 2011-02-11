@@ -1025,6 +1025,32 @@ void Stop(int p_egid, int p_euid, int p_pid)
  }
 }
 
+void StopAs(int p_pid, int p_euid, int p_egid){ 
+ // TODO Read the euid / egid information from service file and compare to input param
+ /* store the return code */
+  int l_ret;
+  /* stores the application name */
+  char l_app_name[DIM_MAX];
+  /* command line for the application */
+  char *l_commandLine;
+  if(AppNameFromPid(p_pid, l_app_name)!=0){
+  l_commandLine = l_app_name;
+  char l_cmd[DIM_MAX];
+  log_message("%s stopped with stop !\n", l_app_name);
+  /* form the systemd command line string */
+  sprintf(l_cmd, "systemctl stop %s.service", l_app_name);
+  /* call systemd */
+  l_ret = system(l_cmd);
+
+  if (l_ret != 0) {
+    log_message("AL Daemon : Application cannot be stopped! Err:%s\n",
+		strerror(errno));
+   }
+  }else{
+	log_message("AL Daemon : Application cannot be stopped because is already stopped !%s", "\n"); 
+ }
+}
+
 void TaskStarted(char *p_imagePath, int p_pid)
 {
   log_message

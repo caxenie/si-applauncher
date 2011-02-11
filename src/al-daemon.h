@@ -59,7 +59,8 @@ extern void RunAs(int egid, int euid, int newPID, bool isFg, int parentPID,
 		  char *commandLine);
 extern void Suspend(int pid);
 extern void Resume(int pid);
-extern void Stop(int egid, int euid, int pid);
+extern void Stop(int pid);
+extern void StopAs(int p_pid, int p_euid, int p_egid);
 /* Send start/stop signals over the bus to the clients */
 extern void TaskStarted(char *imagePath, int pid);
 extern void TaskStopped(char *imagePath, int pid);
