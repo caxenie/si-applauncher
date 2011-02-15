@@ -271,7 +271,10 @@ int AppExistsInSystem(char *p_app_name)
   return 0;
 }
 
-/* Function responsible to parse the .timer unit and extract the triggering key */
+/* 
+ * Function responsible to parse the .timer unit and extract the triggering key 
+ * also it can acces a service file to extract its structure 
+ */
 GKeyFile *ParseUnitFile(char *p_file)
 {
   /* key file group length */
@@ -285,18 +288,31 @@ GKeyFile *ParseUnitFile(char *p_file)
   /* load key file structure from file on disk */
   if (!g_key_file_load_from_file
       (l_out_new_key_file, p_file, G_KEY_FILE_NONE, &l_err)) {
+   /* test if unit is a timer or a normal service */
+   if(strstr(p_file, ".timer")==NULL){
     log_message
-	("AL Daemon Unit File Parser : Cannot load from timer unit key file! (%d: %s)\n",
+	("AL Daemon Unit File Parser : Cannot load key structure from service unit key file! (%d: %s)\n",
 	 l_err->code, l_err->message);
-    return NULL;
+    }else{
+    log_message
+	("AL Daemon Unit File Parser : Cannot load key structure from timer unit key file! (%d: %s)\n",
+	 l_err->code, l_err->message);
+    }
     g_error_free(l_err);
+    return NULL;
   }
   /* extract groups from key file structure */
   l_groups = g_key_file_get_groups(l_out_new_key_file, &l_groups_length);
   if (l_groups == NULL) {
+   if(strstr(p_file,".timer")==NULL){
+    log_message
+	("AL Daemon Unit File Parser : Could not retrieve groups from %s service unit file!\n",
+	 p_file);
+    }else{	
     log_message
 	("AL Daemon Unit File Parser : Could not retrieve groups from %s timer unit file!\n",
 	 p_file);
+    }
     return NULL;
   }
   unsigned long l_i;
@@ -310,10 +326,16 @@ GKeyFile *ParseUnitFile(char *p_file)
 			    &l_keys_length, &l_err);
     /* check if the file is properly structured */
     if (l_keys == NULL) {
+     if(strstr(p_file,".timer")==NULL){
+       log_message
+	  ("AL Daemon Unit File Parser : Error in retrieving keys in service unit file! (%d: %s)",
+	   l_err->code, l_err->message);
+     }else{
       log_message
 	  ("AL Daemon Unit File Parser : Error in retrieving keys in timer unit file! (%d: %s)",
 	   l_err->code, l_err->message);
-      g_error_free(l_err);
+     } 
+     g_error_free(l_err);
     } else {
       unsigned long l_j;
       /* loop to get key values */
@@ -325,9 +347,15 @@ GKeyFile *ParseUnitFile(char *p_file)
 				  l_keys[l_j], &l_err);
 	/* check value validity */
 	if (l_str_value == NULL) {
-	  log_message
+	  if(strstr(p_file,".timer")==NULL){
+	   log_message
+	      ("AL Daemon Unit File Parser : Error retrieving key's value in service unit file. (%d, %s)\n",
+	       l_err->code, l_err->message);
+	  }else{
+	   log_message
 	      ("AL Daemon Unit File Parser : Error retrieving key's value in timer unit file. (%d, %s)\n",
 	       l_err->code, l_err->message);
+	  }
 	  g_error_free(l_err);
 	}
       }
@@ -337,17 +365,41 @@ GKeyFile *ParseUnitFile(char *p_file)
   return l_out_new_key_file;
 }
 
-/* Function responsible to parse the .timer unit and setup the triggering key value */
+/* 
+ * Function responsible to parse the .timer unit and setup the triggering key value
+ * also it can setup the specific egid and euid values 
+ */
+
 void SetupUnitFileKey(char *p_file, char *p_key, char *p_val, char *p_unit)
 {
-  /* key file handlers */
+  /* key file handler */
   int l_fd;
-
+  if(strstr(p_file,".timer")==NULL){
+  log_message
+      ("AL Daemon Service Unit Setup : Entered the Setup service unit sequence for %s \n",
+       p_unit);
+  }else{
   log_message
       ("AL Daemon Timer Unit Setup : Entered the Setup timer unit sequence for %s \n",
-       p_file);
+       p_unit);
+  }
 
-  /* test file existence and create if not exists */
+  /* test application service file existence and exit with error if it doesn't exist */
+  if(strstr(p_file,".timer")==NULL){
+    	if (!g_file_test(p_file, G_FILE_TEST_EXISTS)) {
+		log_message("AL Daemon Service Unit Setup : Service file %s doesn't exist !\n",
+		p_file);
+	return;
+	}
+	/* open the corresponding key file for the service to write */
+        if (!g_fopen(p_file, "rw")) {
+      	  log_message
+	    ("AL Daemon Service Unit Setup : Cannot open service unit file %s for adding data !\n",
+	     p_file);
+        return;
+        }
+  }else{
+  /* test timer file existence and create if not exists */
   if (!g_file_test(p_file, G_FILE_TEST_EXISTS)) {
     /* initialize the error */
     GError *l_error = NULL;
@@ -360,7 +412,7 @@ void SetupUnitFileKey(char *p_file, char *p_key, char *p_val, char *p_unit)
     l_fd = creat(p_file, 777);
     log_message("AL Daemon : File %s created !\n", p_file);
     /* open the key file for write */
-    if (!g_fopen(p_file, "w")) {
+    if (!g_fopen(p_file, "rw")) {
       log_message
 	  ("AL Daemon Timer Unit Setup : Cannot open timer unit file %s for adding data !\n",
 	   p_file);
@@ -379,14 +431,24 @@ void SetupUnitFileKey(char *p_file, char *p_key, char *p_val, char *p_unit)
 
     log_message("AL Daemon Timer Unit Setup : File %s is wrote !\n",
 		p_file);
+   }
   }
   /* parse the key value file */
   GKeyFile *l_key_file = ParseUnitFile(p_file);
+  /* key file length */
   gsize l_file_length;
-
+ 
   /* modify the entries according input params  */
-  g_key_file_set_string(l_key_file, "Timer", p_key, p_val);
-
+  if(strstr(p_file,".timer")==NULL){
+  	/* if the unit file is an application service file */
+  	/* the setup will be done in the Service group adding values for User and Group */
+  	g_key_file_set_string(l_key_file, "Service", p_key, p_val);
+  }else{
+  	/* if the unit is a timer access the Timerstr group in the key file */
+  	g_key_file_set_string(l_key_file, "Timer", p_key, p_val);
+  }
+  
+  /* setup the error */
   GError *l_err = NULL;
   /* write new data to file */
   gchar *l_new_file_data =
@@ -395,20 +457,120 @@ void SetupUnitFileKey(char *p_file, char *p_key, char *p_val, char *p_unit)
   g_key_file_free(l_key_file);
   /* test if file is accessible */
   if (l_new_file_data == NULL) {
+   /* if the key file is for a service file */
+   if(strstr(p_file,".timer")==NULL){
+    log_message
+	("AL Daemon Service Unit Setup : Could not get new file data for service unit! (%d: %s)",
+	 l_err->code, l_err->message);
+    g_error_free(l_err);
+    return;
+   }else{ /* if the key file corresponds to timer file */
     log_message
 	("AL Daemon Timer Unit Setup : Could not get new file data for timer unit! (%d: %s)",
 	 l_err->code, l_err->message);
     g_error_free(l_err);
     return;
+   }
   }
   /* setup the new content in the key value file */
   if (!g_file_set_contents(p_file, l_new_file_data, l_file_length, &l_err)) {
+   /* if the key file corresponds to a service file */
+   if(strstr(p_file,".timer")==NULL){
+    log_message
+	("AL Daemon Service Unit Setup : Could not save new file for service unit! (%d: %s)",
+	 l_err->code, l_err->message);
+    g_error_free(l_err);
+    return;
+   }else{ /* if the key file corresponds to timer file */
     log_message
 	("AL Daemon Timer Unit Setup : Could not save new file for timer unit! (%d: %s)",
 	 l_err->code, l_err->message);
     g_error_free(l_err);
     return;
+   }
   }
+}
+
+/* Function responsible to parse the service unit and extract ownership info */
+void ExtractOwnershipInfo(char *p_euid, char *p_egid, char *p_file)
+{
+  /* key file group length */
+  gsize l_groups_length;
+  /* store the groups in the keyfile */
+  char **l_groups;
+  /* local store of egid and euid */
+  char *l_gid = malloc(DIM_MAX*sizeof(l_gid));
+  char *l_uid = malloc(DIM_MAX*sizeof(l_uid));
+  /* the created GKeyFile for the given file on disk */
+  GKeyFile *l_out_new_key_file = g_key_file_new();
+  /* initialize the error */
+  GError *l_err = NULL;
+  /* load key file structure from file on disk */
+  if (!g_key_file_load_from_file
+      (l_out_new_key_file, p_file, G_KEY_FILE_NONE, &l_err)) {
+      log_message
+	("AL Daemon Unit File Parser : Cannot load key structure from service unit key file! (%d: %s)\n",
+	 l_err->code, l_err->message);
+    g_error_free(l_err);
+    return;
+  }
+  /* extract groups from key file structure */
+  l_groups = g_key_file_get_groups(l_out_new_key_file, &l_groups_length);
+  log_message
+	("AL Daemon Ownership Info Extractor : Extracted groups from key file for %s \n",
+	 p_file);
+  if (l_groups == NULL) {
+    log_message
+	("AL Daemon Ownership Info Extractor : Could not retrieve groups from %s service unit file!\n",
+	 p_file);
+      return;
+  }
+  unsigned long l_i;
+  /* loop to get keys from key fle structure */
+  for (l_i = 0; l_i < l_groups_length; l_i++) {
+    gsize l_keys_length;
+    char **l_keys;
+    /* get current key from file */
+    l_keys =
+	g_key_file_get_keys(l_out_new_key_file, l_groups[l_i],
+			    &l_keys_length, &l_err);
+    log_message
+	("AL Daemon Ownership Info Extractor : Extracted keys from key file for %s \n",
+	 p_file);
+    /* check if the file is properly structured */
+    if (l_keys == NULL) {
+      log_message
+	  ("AL Daemon Ownership Info Extractor : Error in retrieving keys in service unit file! (%d: %s)",
+	   l_err->code, l_err->message);
+          g_error_free(l_err);
+    } else {
+      unsigned long l_j;
+      /* loop to get key values */
+      for (l_j = 0; l_j < l_keys_length; l_j++) {
+	char *l_str_value;
+	/* extract current value for a given key */
+	l_str_value =
+	    g_key_file_get_string(l_out_new_key_file, l_groups[l_i],
+				  l_keys[l_j], &l_err); 
+        if(strcmp(l_keys[l_j], "User")==0){
+		l_uid = l_str_value;		
+ 	}
+        if(strcmp(l_keys[l_j], "Group")==0){
+		l_gid = l_str_value;		
+ 	}
+	/* check value validity */
+	if (l_str_value == NULL) {
+	  log_message
+	      ("AL Daemon Ownership Info Extractor : Error retrieving key's value in service unit file. (%d, %s)\n",
+	       l_err->code, l_err->message);
+	    g_error_free(l_err);
+	}
+      }
+    }
+  }
+  /* the extracted ownership values */
+  strcpy(p_egid, l_gid);
+  strcpy(p_euid, l_uid);
 }
 
 /* 
@@ -782,7 +944,7 @@ free_res:
  * or an application already running in the system. 
  */
 
-void AlAppStateNotifier(DBusConnection * p_conn, char *p_app_name)
+void AlAppStateNotifier(DBusConnection *p_conn, char *p_app_name)
 {
 
   /* message to be sent */
@@ -876,7 +1038,7 @@ void Run(int p_newPID, bool p_isFg, int p_parentPID, char *p_commandLine)
   int l_ret;
   /* application PID */
   int l_pid;
-  log_message("%s started with run !\n", p_commandLine);
+  log_message("AL Daemon Run : %s started with run !\n", p_commandLine);
   /* the command line for the application */
   char l_cmd[DIM_MAX];
   /* form the call string for systemd */
@@ -895,14 +1057,14 @@ void Run(int p_newPID, bool p_isFg, int p_parentPID, char *p_commandLine)
   l_ret = system(l_cmd);
   if (l_ret == -1) {
     log_message
-	("AL Daemon : Application cannot be started with run! Err: %s\n",
+	("AL Daemon Run : Application cannot be started with run! Err: %s\n",
 	 strerror(errno));
     return;
   }
   /* extract the PID from the application name only if the start is valid */
   l_pid = (int)AppPidFromName(p_commandLine);
   p_newPID = l_pid;
-  log_message("%s was started with run and has PID : %d\n", p_commandLine, p_newPID);
+  log_message("AL Daemon Run : %s was started with run and has PID : %d\n", p_commandLine, p_newPID);
 }
 
 void RunAs(int p_egid, int p_euid, int p_newPID, bool p_isFg, int p_parentPID,
@@ -914,9 +1076,20 @@ void RunAs(int p_egid, int p_euid, int p_newPID, bool p_isFg, int p_parentPID,
   int l_ret;
   /* application PID */
   int l_pid;
-  log_message("%s started with runas !\n", p_commandLine);
+  /* egid and euid strings */
+  char *l_str_egid = malloc(DIM_MAX*sizeof(l_str_egid));
+  char *l_str_euid = malloc(DIM_MAX*sizeof(l_str_euid));
+  /* extracted euid and egid values from service file */
+  char *l_gid = malloc(DIM_MAX*sizeof(l_gid));
+  char *l_uid = malloc(DIM_MAX*sizeof(l_uid));
+  sprintf(l_str_egid, "%d", p_egid);
+  sprintf(l_str_euid, "%d", p_euid);
+  log_message("AL Daemon RunAs : %s started with runas !\n", p_commandLine);
   /* the command line for the application */
   char l_cmd[DIM_MAX];
+  /* the service file path */
+  char l_srv_path[DIM_MAX];
+  sprintf(l_srv_path, "/lib/systemd/system/%s.service", p_commandLine);
   /* form the call string for systemd */
   sprintf(l_cmd, "systemctl start %s.service", p_commandLine);
   /* check if the unit has an associated timer and adjust the call string */
@@ -929,18 +1102,31 @@ void RunAs(int p_egid, int p_euid, int p_newPID, bool p_isFg, int p_parentPID,
   if (strcmp(p_commandLine, "poweroff") == 0) {
     sprintf(l_cmd, "systemctl start %s.timer", p_commandLine);
   }
+  /* SetupUnitFileKey call to setup the key and corresponding values, if not existing will be created */
+  /* the service file will be updated with proper Group and User information */
+  SetupUnitFileKey(l_srv_path, "Group", l_str_egid, p_commandLine);
+  SetupUnitFileKey(l_srv_path, "User", l_str_euid, p_commandLine);
+  /* check ownership and execution rights before running the application */
+  ExtractOwnershipInfo(l_uid, l_gid, l_srv_path);
+  log_message
+	("AL Daemon RunAs : Extracted ownership information for %s \n",
+	 p_commandLine);
+  if((strcmp(l_uid, l_str_euid)!=0) && (strcmp(l_gid, l_str_egid)!=0)){
+	log_message("AL Daemon : The current user doesn't have permissions to runas %s!\n", p_commandLine); 
+ 	return;
+  }
   /* systemd invocation */
   l_ret = system(l_cmd);
   if (l_ret == -1) {
     log_message
-	("AL Daemon : Application cannot be started with runas! Err: %s\n",
+	("AL Daemon RunAs : Application cannot be started with runas! Err: %s\n",
 	 strerror(errno));
      return;
   }
   /* extract the PID from the application name only if the start is valid */
   l_pid = (int)AppPidFromName(p_commandLine);
   p_newPID = l_pid;
-  log_message("%s was started with runas and has PID : %d\n", p_commandLine, p_newPID);
+  log_message("AL Daemon RunAs : %s was started with runas and has PID : %d\n", p_commandLine, p_newPID);
 }
 
 void Suspend(int p_pid)
@@ -956,7 +1142,7 @@ void Suspend(int p_pid)
   if(AppNameFromPid(p_pid, l_app_name)!=0){
   l_commandLine = l_app_name;
   char l_cmd[DIM_MAX];
-  log_message("%s canceled with suspend !\n", l_commandLine);
+  log_message("AL Daemon Suspend : %s canceled with suspend !\n", l_commandLine);
   /* form the systemd command line string */
   sprintf(l_cmd, "systemctl cancel %s.service", l_commandLine);
   /* call systemd */
@@ -964,11 +1150,11 @@ void Suspend(int p_pid)
 
   if (l_ret == -1) {
     log_message
-	("AL Daemon : Application cannot be suspended! Err:%s\n",
+	("AL Daemon Suspend : Application cannot be suspended! Err:%s\n",
 	 strerror(errno));
    }
   }else{
-	log_message("AL Daemon : Application cannot be suspended because is already stopped !%s", "\n"); 
+	log_message("AL Daemon Suspend : Application %s cannot be suspended because is already stopped !\n", l_commandLine); 
  }
 }
 
@@ -984,18 +1170,18 @@ void Resume(int p_pid)
   if(AppNameFromPid(p_pid, l_app_name)!=0){
   l_commandLine = l_app_name;
   char l_cmd[DIM_MAX];
-  log_message("%s restarted with resume !\n", l_commandLine);
+  log_message("AL Daemon Resume : %s restarted with resume !\n", l_commandLine);
   /* form the systemd command line string */
   sprintf(l_cmd, "systemctl restart %s.service", l_commandLine);
   /* call systemd */
   l_ret = system(l_cmd);
 
   if (l_ret == -1) {
-    log_message("AL Daemon : Application cannot be resumed! Err:%s\n",
+    log_message("AL Daemon Resume : Application cannot be resumed! Err:%s\n",
 		strerror(errno));
     }
    }else{
-	log_message("AL Daemon : Application cannot be resumed because is stopped !%s", "\n"); 
+	log_message("AL Daemon Resume : Application %s cannot be resumed because is stopped !\n", l_commandLine); 
  }
 }
 
@@ -1010,58 +1196,79 @@ void Stop(int p_pid)
   if(AppNameFromPid(p_pid, l_app_name)!=0){
   l_commandLine = l_app_name;
   char l_cmd[DIM_MAX];
-  log_message("%s stopped with stop !\n", l_app_name);
+  log_message("AL Daemon Stop : %s stopped with stop !\n", l_commandLine);
   /* form the systemd command line string */
-  sprintf(l_cmd, "systemctl stop %s.service", l_app_name);
+  sprintf(l_cmd, "systemctl stop %s.service", l_commandLine);
   /* call systemd */
   l_ret = system(l_cmd);
 
   if (l_ret != 0) {
-    log_message("AL Daemon : Application cannot be stopped! Err:%s\n",
+    log_message("AL Daemon Stop : Application cannot be stopped! Err:%s\n",
 		strerror(errno));
    }
   }else{
-	log_message("AL Daemon : Application cannot be stopped because is already stopped !%s", "\n"); 
+	log_message("AL Daemon Stop : Application %s cannot be stopped because is already stopped !\n", l_commandLine); 
  }
 }
 
 void StopAs(int p_pid, int p_euid, int p_egid){ 
- // TODO Read the euid / egid information from service file and compare to input param
- /* store the return code */
+  /* store the return code */
   int l_ret;
   /* stores the application name */
   char l_app_name[DIM_MAX];
   /* command line for the application */
   char *l_commandLine;
+  /* extracted euid and egid values from service file */
+  char *l_gid = malloc(DIM_MAX*sizeof(l_gid));
+  char *l_uid = malloc(DIM_MAX*sizeof(l_uid));
+  /* application service fiel path */
+  char l_srv_path[DIM_MAX];
+   /* egid and euid strings */
+  char *l_str_egid = malloc(DIM_MAX*sizeof(l_str_egid));
+  char *l_str_euid = malloc(DIM_MAX*sizeof(l_str_euid));
+  /* test if application runs in the system */
   if(AppNameFromPid(p_pid, l_app_name)!=0){
   l_commandLine = l_app_name;
+  /* for the path to the application service */
+  sprintf(l_srv_path, "/lib/systemd/system/%s.service", l_commandLine);
+  /* low level command to systemd */
   char l_cmd[DIM_MAX];
-  log_message("%s stopped with stop !\n", l_app_name);
+  log_message("AL Daemon StopAs : %s stopped with stopas !\n", l_app_name);
   /* form the systemd command line string */
   sprintf(l_cmd, "systemctl stop %s.service", l_app_name);
+  /* test ownership and rights before stopping application */
+  ExtractOwnershipInfo(l_uid, l_gid, l_srv_path);
+  log_message("AL Daemon StopAs : The ownership information was extracted properly [ uid : %s ] and [ gid : %s ]\n", l_uid, l_gid);
+  /* convert input egid and euid params into string for comparison */
+  sprintf(l_str_egid, "%d", p_egid);
+  sprintf(l_str_euid, "%d", p_euid);
+  log_message("AL Daemon StopAs : The input ownership information [ uid : %s ] and [ gid : %s ]\n", l_str_euid, l_str_egid);
+  if((strcmp(l_uid, l_str_euid)!=0) && (strcmp(l_gid, l_str_egid)!=0)){
+	log_message("AL Daemon StopAs : The current user doesn't have permissions to stopas %s!\n", l_commandLine); 
+ 	return;
+  }
   /* call systemd */
   l_ret = system(l_cmd);
-
   if (l_ret != 0) {
-    log_message("AL Daemon : Application cannot be stopped! Err:%s\n",
+    log_message("AL Daemon StopAs : Application cannot be stopped! Err:%s\n",
 		strerror(errno));
    }
   }else{
-	log_message("AL Daemon : Application cannot be stopped because is already stopped !%s", "\n"); 
+	log_message("AL Daemon StopAs : Application %s cannot be stopped because is already stopped !\n", l_commandLine); 
  }
 }
 
 void TaskStarted(char *p_imagePath, int p_pid)
 {
   log_message
-      ("AL Daemon : Task %d %s was started and signal %s was emitted!\n",
+      ("AL Daemon TaskStarted Signal : Task %d %s was started and signal %s was emitted!\n",
        p_pid, p_imagePath, AL_SIGNAME_TASK_STARTED);
 }
 
 void TaskStopped(char *p_imagePath, int p_pid)
 {
   log_message
-      ("AL Daemon : Task %d %s was stopped and signal %s was emitted!\n",
+      ("AL Daemon TaskStopped Signal : Task %d %s was stopped and signal %s was emitted!\n",
        p_pid, p_imagePath, AL_SIGNAME_TASK_STOPPED);
 }
 
@@ -1074,13 +1281,13 @@ void Restart(char *p_app_name)
   int l_ret;
   /* the command line for the application */
   char l_cmd[DIM_MAX];
-  log_message("%s will be restarted !\n", p_app_name);
+  log_message("AL Daemon Restart : %s will be restarted !\n", p_app_name);
   sprintf(l_cmd, "systemctl restart %s.service", p_app_name);
   /* systemd invocation */
   l_ret = system(l_cmd);
   if (l_ret != 0) {
     log_message
-	("AL Daemon : Application cannot be restarted with restart! Err: %s\n",
+	("AL Daemon Restart : Application cannot be restarted with restart! Err: %s\n",
 	 strerror(errno));
   }
 } 
@@ -1735,7 +1942,7 @@ void AlListenToMethodCall()
 	    ("AL Daemon Method Call Listener : Cannot stop %s !\n",
 	     l_app, l_app);
 
-	/* check the application current state before starting it */
+	/* check the application current state before stopping it */
 	/* extract the application state for testing existence */
 	if (AlGetAppState(l_conn, strcat(l_app, ".service"), l_state_info)
 	    == 0) {
@@ -1763,7 +1970,60 @@ void AlListenToMethodCall()
 	}
       }
       /* stop the application */
-      Stop(0, 0, (int) AppPidFromName(l_app));
+      Stop((int) AppPidFromName(l_app));
+    }
+
+        /* check if this is a method call for the right interface amd method */
+    if (dbus_message_is_method_call(l_msg, AL_METHOD_INTERFACE, "StopAs")) {
+      AlReplyToMethodCall(l_msg, l_conn);
+      /* extract application name */
+      dbus_message_get_args(l_msg, &l_err, DBUS_TYPE_STRING,
+			    &l_app, DBUS_TYPE_INVALID);
+      log_message
+	  ("AL Daemon Method Call Listener : Stopping application %s with stopas !\n",
+	   l_app);
+      /* extract application pid from its name */
+      if (!(l_r = (int) AppPidFromName(l_app))) {
+	/* test for application service file existence */
+	if (!AppExistsInSystem(l_app)) {
+	  log_message
+	      ("AL Daemon Method Call Listener : Cannot stopas %s !\n Application %s is not found in the system !\n",
+	       l_app, l_app);
+	  continue;
+	}
+	log_message
+	    ("AL Daemon Method Call Listener : Cannot stopas %s !\n",
+	     l_app, l_app);
+
+	/* check the application current state before stopping it */
+	/* extract the application state for testing existence */
+	if (AlGetAppState(l_conn, strcat(l_app, ".service"), l_state_info)
+	    == 0) {
+
+	  /* copy the state */
+	  l_app_status = strdup(l_state_info);
+
+	  /* active state extraction from global state info */
+	  l_active_state = strtok(l_app_status, l_delim_serv);
+	  l_active_state = strtok(NULL, l_delim_serv);
+	  l_active_state = strtok(NULL, l_delim_serv);
+	  l_sub_state = strtok(NULL, l_delim_serv);
+
+	}
+
+	if ((strcmp(l_active_state, "active") != 0)
+	    && (strcmp(l_active_state, "reloading") != 0)
+	    && (strcmp(l_active_state, "activating") != 0)
+	    && (strcmp(l_active_state, "deactivating") != 0)) {
+
+	  log_message
+	      ("AL Daemon Method Call Listener : Cannot stopas %s !\n Application %s is already stopped !\n",
+	       l_app, l_app);
+	  continue;
+	}
+      }
+      /* stopas the application */
+      StopAs((int) AppPidFromName(l_app), 0, 0);
     }
 
     /* check if this is a method call for the right interface amd method */
@@ -1817,7 +2077,6 @@ void AlListenToMethodCall()
       }
       /* resume the application */
       Resume((int) AppPidFromName(l_app));
-
     }
 
     /* check if this is a method call for the right interface amd method */

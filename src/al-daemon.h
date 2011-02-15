@@ -60,7 +60,7 @@ extern void RunAs(int egid, int euid, int newPID, bool isFg, int parentPID,
 extern void Suspend(int pid);
 extern void Resume(int pid);
 extern void Stop(int pid);
-extern void StopAs(int p_pid, int p_euid, int p_egid);
+extern void StopAs(int pid, int euid, int egid);
 /* Send start/stop signals over the bus to the clients */
 extern void TaskStarted(char *imagePath, int pid);
 extern void TaskStopped(char *imagePath, int pid);
@@ -72,6 +72,8 @@ extern void AlReplyToMethodCall(DBusMessage * msg, DBusConnection * conn);
 extern void AlListenToMethodCall();
 /* Function responsible to parse the .timer unit and extract the triggering key */
 extern GKeyFile *ParseUnitFile(char *file);
+/* Function responsible to parse the service unit and extract ownership info */
+extern void ExtractOwnershipInfo(char *euid, char *egid, char *file);
 /* Function responsible to parse the .timer unit and setup the triggering key value */
 extern void SetupUnitFileKey(char *file, char *key, char *val, char *unit);
 /* Function to extract the status of an application after starting it or that is already running in the system */
@@ -81,6 +83,6 @@ extern int AlGetAppState(DBusConnection * bus, char *app_name,
 extern void AlAppStateNotifier(DBusConnection * bus, char *app_name);
 /* Function responsible to test if a given application exists in the system. */
 extern int AppExistsInSystem(char *app_name);
-    /* Function responsible with restarting an application when SHM detects an abnormal operation of the application */
+/* Function responsible with restarting an application when SHM detects an abnormal operation of the application */
 extern void Restart(char *app_name);
 #endif
