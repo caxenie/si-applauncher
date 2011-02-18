@@ -55,7 +55,7 @@ extern pid_t AppPidFromName(char *app_name);
 extern int AppNameFromPid(int pid, char *app_name);
 /* High level interface for the AL Daemon */
 extern void Run(int newPID, bool isFg, int parentPID, char *commandLine);
-extern void RunAs(int egid, int euid, int newPID, bool isFg, int parentPID,
+extern void RunAs(int euid, int egid, int newPID, bool isFg, int parentPID,
 		  char *commandLine);
 extern void Suspend(int pid);
 extern void Resume(int pid);
@@ -85,4 +85,8 @@ extern void AlAppStateNotifier(DBusConnection * bus, char *app_name);
 extern int AppExistsInSystem(char *app_name);
 /* Function responsible with restarting an application when SHM detects an abnormal operation of the application */
 extern void Restart(char *app_name);
+/* Function responsible to extract the user name from the uid */
+extern void MapUidToUser(int uid, char *user);
+/* Function responsible to extract the group name from the gid */
+extern void MapGidToGroup(int gid, char *group);
 #endif

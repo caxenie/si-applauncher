@@ -28,7 +28,9 @@
 #include <getopt.h>
 #include <glib/gstdio.h>
 #include <glib.h>
+#include <grp.h>
 #include <libgen.h>
+#include <pwd.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -275,6 +277,7 @@ int AppExistsInSystem(char *p_app_name)
  * Function responsible to parse the .timer unit and extract the triggering key 
  * also it can acces a service file to extract its structure 
  */
+
 GKeyFile *ParseUnitFile(char *p_file)
 {
   /* key file group length */
@@ -571,6 +574,38 @@ void ExtractOwnershipInfo(char *p_euid, char *p_egid, char *p_file)
   /* the extracted ownership values */
   strcpy(p_egid, l_gid);
   strcpy(p_euid, l_uid);
+}
+
+/* Function responsible to extract the user name from the uid */
+void MapUidToUser(int p_uid, char *p_user){
+  /* handler for passwd */
+  struct passwd *l_pwd;
+  /* storage for uid */
+  uid_t l_uid = (uid_t)p_uid;
+  /* check id existence */
+  if ((l_pwd = getpwuid(p_uid))==NULL){
+         printf("AL Daemon UID to User Mapper : UID %d is not associated with any existing user !\n", p_uid);
+	 return;
+	 }
+  /* extract the user from the structure */
+  strcpy(p_user, l_pwd->pw_name);
+  printf("AL Daemon UID to User Mapper : uid=%d(%s) \n", p_uid, p_user);
+}
+
+/* Function responsible to extract the group name from the gid */
+void MapGidToGroup(int p_gid, char *p_group){
+  /* handler for group info */
+  struct group *l_gp;
+  /* storage for gid */
+  gid_t l_gid = (gid_t)p_gid;
+  /* check group */
+  if ((l_gp = getgrgid(l_gid))==NULL){
+	printf("AL Daemon GID to User Mapper : GID %d is not associated with any existing group !\n", p_gid);
+	return;	
+	}
+  /* extract guid information */
+  strcpy(p_group, l_gp->gr_name);
+  printf("AL Daemon GID to Group Mapper : gid=%d(%s) \n", p_gid, p_group);
 }
 
 /* 
@@ -1064,7 +1099,7 @@ void Run(int p_newPID, bool p_isFg, int p_parentPID, char *p_commandLine)
   /* extract the PID from the application name only if the start is valid */
   l_pid = (int)AppPidFromName(p_commandLine);
   p_newPID = l_pid;
-  log_message("AL Daemon Run : %s was started with run and has PID : %d\n", p_commandLine, p_newPID);
+  log_message("AL Daemon Run : %s was started with run !\n", p_commandLine);
 }
 
 void RunAs(int p_egid, int p_euid, int p_newPID, bool p_isFg, int p_parentPID,
@@ -1076,14 +1111,9 @@ void RunAs(int p_egid, int p_euid, int p_newPID, bool p_isFg, int p_parentPID,
   int l_ret;
   /* application PID */
   int l_pid;
-  /* egid and euid strings */
-  char *l_str_egid = malloc(DIM_MAX*sizeof(l_str_egid));
-  char *l_str_euid = malloc(DIM_MAX*sizeof(l_str_euid));
-  /* extracted euid and egid values from service file */
-  char *l_gid = malloc(DIM_MAX*sizeof(l_gid));
-  char *l_uid = malloc(DIM_MAX*sizeof(l_uid));
-  sprintf(l_str_egid, "%d", p_egid);
-  sprintf(l_str_euid, "%d", p_euid);
+  /* local handlers for user and group to be written in the service file */
+  char *l_user = malloc(DIM_MAX*sizeof(l_user));
+  char *l_group = malloc(DIM_MAX*sizeof(l_group));
   log_message("AL Daemon RunAs : %s started with runas !\n", p_commandLine);
   /* the command line for the application */
   char l_cmd[DIM_MAX];
@@ -1102,18 +1132,21 @@ void RunAs(int p_egid, int p_euid, int p_newPID, bool p_isFg, int p_parentPID,
   if (strcmp(p_commandLine, "poweroff") == 0) {
     sprintf(l_cmd, "systemctl start %s.timer", p_commandLine);
   }
+  /* extract user name and group name from uid and gid */
+  MapUidToUser(p_euid, l_user);
+  MapGidToGroup(p_egid, l_group);
   /* SetupUnitFileKey call to setup the key and corresponding values, if not existing will be created */
   /* the service file will be updated with proper Group and User information */
-  SetupUnitFileKey(l_srv_path, "Group", l_str_egid, p_commandLine);
-  SetupUnitFileKey(l_srv_path, "User", l_str_euid, p_commandLine);
-  /* check ownership and execution rights before running the application */
-  ExtractOwnershipInfo(l_uid, l_gid, l_srv_path);
-  log_message
-	("AL Daemon RunAs : Extracted ownership information for %s \n",
-	 p_commandLine);
-  if((strcmp(l_uid, l_str_euid)!=0) && (strcmp(l_gid, l_str_egid)!=0)){
-	log_message("AL Daemon : The current user doesn't have permissions to runas %s!\n", p_commandLine); 
- 	return;
+  SetupUnitFileKey(l_srv_path, "User", l_user, p_commandLine);
+  SetupUnitFileKey(l_srv_path, "Group", l_group, p_commandLine); 
+  log_message("AL Daemon RunAs : Service file was updated with User=%s and Group=%s information !\n", l_user, l_group);
+  /* issue daemon reload to apply and acknowledge modifications to the service file on the disk */
+  l_ret = system("systemctl daemon-reload --system");
+  if (l_ret == -1) {
+    log_message
+	("AL Daemon RunAs : After setting the service file reload systemd manager configuration failed ! Err: %s\n",
+	 strerror(errno));
+     return;
   }
   /* systemd invocation */
   l_ret = system(l_cmd);
@@ -1126,7 +1159,7 @@ void RunAs(int p_egid, int p_euid, int p_newPID, bool p_isFg, int p_parentPID,
   /* extract the PID from the application name only if the start is valid */
   l_pid = (int)AppPidFromName(p_commandLine);
   p_newPID = l_pid;
-  log_message("AL Daemon RunAs : %s was started with runas and has PID : %d\n", p_commandLine, p_newPID);
+  log_message("AL Daemon RunAs : %s was started with runas !\n", p_commandLine);
 }
 
 void Suspend(int p_pid)
@@ -1218,12 +1251,12 @@ void StopAs(int p_pid, int p_euid, int p_egid){
   char l_app_name[DIM_MAX];
   /* command line for the application */
   char *l_commandLine;
-  /* extracted euid and egid values from service file */
-  char *l_gid = malloc(DIM_MAX*sizeof(l_gid));
-  char *l_uid = malloc(DIM_MAX*sizeof(l_uid));
+  /* extracted user and group values from service file */
+  char *l_group = malloc(DIM_MAX*sizeof(l_group));
+  char *l_user = malloc(DIM_MAX*sizeof(l_user));
   /* application service fiel path */
   char l_srv_path[DIM_MAX];
-   /* egid and euid strings */
+   /* group and user strings */
   char *l_str_egid = malloc(DIM_MAX*sizeof(l_str_egid));
   char *l_str_euid = malloc(DIM_MAX*sizeof(l_str_euid));
   /* test if application runs in the system */
@@ -1237,13 +1270,13 @@ void StopAs(int p_pid, int p_euid, int p_egid){
   /* form the systemd command line string */
   sprintf(l_cmd, "systemctl stop %s.service", l_app_name);
   /* test ownership and rights before stopping application */
-  ExtractOwnershipInfo(l_uid, l_gid, l_srv_path);
-  log_message("AL Daemon StopAs : The ownership information was extracted properly [ uid : %s ] and [ gid : %s ]\n", l_uid, l_gid);
-  /* convert input egid and euid params into string for comparison */
-  sprintf(l_str_egid, "%d", p_egid);
-  sprintf(l_str_euid, "%d", p_euid);
-  log_message("AL Daemon StopAs : The input ownership information [ uid : %s ] and [ gid : %s ]\n", l_str_euid, l_str_egid);
-  if((strcmp(l_uid, l_str_euid)!=0) && (strcmp(l_gid, l_str_egid)!=0)){
+  ExtractOwnershipInfo(l_user, l_group, l_srv_path);
+  log_message("AL Daemon StopAs : The ownership information was extracted properly [ user : %s ] and [ group : %s ]\n", l_user, l_group);
+  /* extract user name and group name from uid and gid */
+  MapUidToUser(p_euid, l_str_euid);
+  MapGidToGroup(p_egid, l_str_egid);
+  log_message("AL Daemon StopAs : The input ownership information [ user: %s ] and [ group : %s ]\n", l_str_euid, l_str_egid);
+  if((strcmp(l_user, l_str_euid)!=0) && (strcmp(l_group, l_str_egid)!=0)){
 	log_message("AL Daemon StopAs : The current user doesn't have permissions to stopas %s!\n", l_commandLine); 
  	return;
   }
@@ -1277,7 +1310,6 @@ void TaskStopped(char *p_imagePath, int p_pid)
  */
 void Restart(char *p_app_name)
 {
-  /* return code for system call */
   int l_ret;
   /* the command line for the application */
   char l_cmd[DIM_MAX];
@@ -1628,15 +1660,20 @@ void AlReplyToMethodCall(DBusMessage * p_msg, DBusConnection * p_conn)
   } else {
     dbus_message_iter_get_basic(&l_args, &l_param);
     log_message
-	("AL Daemon Reply to Method Call : Method called with %s\n",
+	("AL Daemon Reply to Method Call : Method called for %s\n",
 	 l_param);
   }
 
   /* create a reply from the message */
   l_reply = dbus_message_new_method_return(p_msg);
-
+  log_message
+	("AL Daemon Reply to Method Call : Reply created for %s\n",
+	 l_param);
   /* add the arguments to the reply */
   dbus_message_iter_init_append(l_reply, &l_args);
+  log_message
+	("AL Daemon Reply to Method Call : Args iter appended for %s\n",
+	 l_param);
   if (!dbus_message_iter_append_basic(&l_args, DBUS_TYPE_BOOLEAN, &l_stat)) {
     log_message
 	("AL Daemon Reply to Method Call : Arg Bool Out Of Memory!%s",
@@ -1661,6 +1698,9 @@ void AlReplyToMethodCall(DBusMessage * p_msg, DBusConnection * p_conn)
 
   /* free the reply */
   dbus_message_unref(l_reply);
+  log_message
+	("AL Daemon Reply to Method Call : Reply sent for %s\n",
+	 l_param);
 }
 
 /* Server that exposes a method call and waits for it to be called */
@@ -1688,7 +1728,16 @@ void AlListenToMethodCall()
   char l_delim_serv[] = " ";
   /* application PID */
   int l_pid;
-  
+  /* ownership values to pass to RunAs or StopAs user dependent methods */
+  int l_uid_val, l_gid_val; 
+  /* timing value for deferred tasks */
+  char *l_time;
+  /* user name to execute task as */
+  char *l_user;
+  /* handlers for deferred execution unit and timing extraction */
+  char *l_app_copy = malloc(DIM_MAX*sizeof(l_app_copy)); 
+  char *l_app_deferred = malloc(DIM_MAX*sizeof(l_app_deferred));
+ 
   log_message
       ("AL Daemon Method Call Listener : Listening for method calls!%s",
        "\n");
@@ -1802,18 +1851,33 @@ void AlListenToMethodCall()
     if (dbus_message_is_method_call(l_msg, AL_METHOD_INTERFACE, "Run")) {
       AlReplyToMethodCall(l_msg, l_conn);
       /* extract application name and arguments */
-      dbus_message_get_args(l_msg, &l_err, DBUS_TYPE_STRING,
-			    &l_app, DBUS_TYPE_STRING, &l_app_args,
+      dbus_message_get_args(l_msg, &l_err,
+                            DBUS_TYPE_STRING, &l_app,
 			    DBUS_TYPE_INVALID);
+      log_message
+	("AL Daemon Method Call Listener Run: Arguments were extracted for %s\n",
+	 l_app);
+      if ((strstr(l_app, "reboot") !=NULL) || (strstr(l_app, "poweroff") !=NULL)){
+	      printf("Deferred execution \n");
+	      strcpy(l_app_copy, l_app);
+	      printf("Application name copy %s\n", l_app_copy);
+	      l_app_deferred = strtok(l_app_copy, " ");
+              printf("Application name extraction %s\n", l_app_deferred);
+	      l_time = strtok(NULL, " ");
+              printf("Timing for deferred execution %s\n", l_time);
+              strcpy(l_app, l_app_copy);
+	      printf("Application name for method call %s\n", l_app);
+      }
+      
       log_message("AL Daemon Method Call Listener : Run app: %s\n", l_app);
       /* if reboot / shutdown unit add deferred functionality in timer file */
-      if (strcmp(l_app, "reboot") == 0) {
+      if (strstr(l_app, "reboot") != NULL) {
 	SetupUnitFileKey("/lib/systemd/system/reboot.timer",
-			 "OnActiveSec", l_app_args, "reboot");
+			 "OnActiveSec", l_time, "reboot");
       }
-      if (strcmp(l_app, "poweroff") == 0) {
+      if (strstr(l_app, "poweroff") != NULL) {
 	SetupUnitFileKey("/lib/systemd/system/poweroff.timer",
-			 "OnActiveSec", l_app_args, "poweroff");
+			 "OnActiveSec", l_time, "poweroff");
       }
 
       /* check for application service file existence */
@@ -1862,20 +1926,32 @@ void AlListenToMethodCall()
     /* check if this is a method call for the right interface amd method */
     if (dbus_message_is_method_call(l_msg, AL_METHOD_INTERFACE, "RunAs")) {
       AlReplyToMethodCall(l_msg, l_conn);
+            
       /* extract application name and arguments */
-      dbus_message_get_args(l_msg, &l_err, DBUS_TYPE_STRING,
-			    &l_app, DBUS_TYPE_STRING, &l_app_args,
+      dbus_message_get_args(l_msg, &l_err, 
+			    DBUS_TYPE_STRING, &l_app,
+ 			    DBUS_TYPE_INT32, &l_uid_val,
+ 			    DBUS_TYPE_INT32, &l_gid_val,
 			    DBUS_TYPE_INVALID);
+      /* test if deferred task */
+      if ((strstr(l_app, "reboot") !=NULL) || (strstr(l_app, "poweroff") !=NULL)){
+	      strcpy(l_app_copy, l_app);
+	      l_app_deferred = strtok(l_app_copy, " ");
+	      l_time = strtok(NULL, " ");
+              strcpy(l_app, l_app_copy);
+      }
+
+   
       /* if reboot / shutdown unit add deferred functionality in timer file */
       log_message("AL Daemon Method Call Listener : RunAs app: %s\n",
 		  l_app);
-      if (strcmp(l_app, "reboot") == 0) {
+      if (strstr(l_app, "reboot") != NULL ) {
 	SetupUnitFileKey("/lib/systemd/system/reboot.timer",
-			 "OnActiveSec", l_app_args, "reboot");
+			 "OnActiveSec", l_time, "reboot");
       }
-      if (strcmp(l_app, "poweroff") == 0) {
+      if (strstr(l_app, "poweroff") != NULL) {
 	SetupUnitFileKey("/lib/systemd/system/poweroff.timer",
-			 "OnActiveSec", l_app_args, "poweroff");
+			 "OnActiveSec", l_time, "poweroff");
       }
       /* check for application service file existence */
       if (!AppExistsInSystem(l_app)) {
@@ -1916,8 +1992,8 @@ void AlListenToMethodCall()
 	  }
 	}
       }
-      /* runas the application */
-      RunAs(0, 0, l_pid, true, 0, l_app);
+      /* runas the application with euid and egid parameters */
+      RunAs(l_uid_val, l_gid_val, l_pid, true, 0, l_app);
     }
 
     /* check if this is a method call for the right interface amd method */
@@ -1973,12 +2049,15 @@ void AlListenToMethodCall()
       Stop((int) AppPidFromName(l_app));
     }
 
-        /* check if this is a method call for the right interface amd method */
+     /* check if this is a method call for the right interface amd method */
     if (dbus_message_is_method_call(l_msg, AL_METHOD_INTERFACE, "StopAs")) {
       AlReplyToMethodCall(l_msg, l_conn);
       /* extract application name */
-      dbus_message_get_args(l_msg, &l_err, DBUS_TYPE_STRING,
-			    &l_app, DBUS_TYPE_INVALID);
+      dbus_message_get_args(l_msg, &l_err, 
+                            DBUS_TYPE_STRING, &l_app,
+ 			    DBUS_TYPE_INT32, &l_uid_val,
+ 			    DBUS_TYPE_INT32, &l_gid_val,
+			    DBUS_TYPE_INVALID);
       log_message
 	  ("AL Daemon Method Call Listener : Stopping application %s with stopas !\n",
 	   l_app);
@@ -2023,7 +2102,7 @@ void AlListenToMethodCall()
 	}
       }
       /* stopas the application */
-      StopAs((int) AppPidFromName(l_app), 0, 0);
+      StopAs((int) AppPidFromName(l_app), l_uid_val, l_gid_val);
     }
 
     /* check if this is a method call for the right interface amd method */
@@ -2136,8 +2215,8 @@ void AlListenToMethodCall()
     if (dbus_message_is_method_call(l_msg, AL_METHOD_INTERFACE, "Restart")) {
       AlReplyToMethodCall(l_msg, l_conn);
       /* extract application name and arguments */
-      dbus_message_get_args(l_msg, &l_err, DBUS_TYPE_STRING,
-			    &l_app, DBUS_TYPE_STRING, &l_app_args,
+      dbus_message_get_args(l_msg, &l_err, 
+			    DBUS_TYPE_STRING, &l_app,
 			    DBUS_TYPE_INVALID);
       log_message("AL Daemon Method Call Listener : Restart app: %s\n", l_app);
       /* check for application service file existence */
