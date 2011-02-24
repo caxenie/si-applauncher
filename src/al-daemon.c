@@ -25,6 +25,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <gconf/gconf-client.h>
 #include <getopt.h>
 #include <glib/gstdio.h>
 #include <glib.h>
@@ -606,6 +607,118 @@ void MapGidToGroup(int p_gid, char *p_group){
   /* extract guid information */
   strcpy(p_group, l_gp->gr_name);
   printf("AL Daemon GID to Group Mapper : gid=%d(%s) \n", p_gid, p_group);
+}
+
+/* 
+ * Function responsible to get the current user as specified in the current_user GConf key.
+ * This will be called once the daemon starts for last user mode functionality
+ */
+
+int GetCurrentUser(GConfClient* p_client, GConfEntry *p_key, char *p_user)
+{ 
+  /* this will hold a pointer to the name of the key */
+  const gchar* l_key = NULL;
+  /* contains the user name */
+  gchar* l_str_val = NULL;
+  /* error handler */
+  GError *l_err = NULL;
+  /* duplicate for extracted name */
+  char *l_usr;
+  /* get key and test for errors */
+  if ((l_key = gconf_entry_get_key(p_key)) == NULL) {
+    log_message("AL Daemon Get Current User : Cannot acces current user key !%s","\n");
+    return 0; 
+  }
+  /* get the current user and check for errors */
+  if((l_str_val = gconf_client_get_string(p_client, l_key, &l_err)) == NULL){
+    log_message("AL Daemon Get Current User : The current user key has invalid content! Err : %s\n",l_err->message);
+    return 0;
+   } 
+  /* to make the user name available when returning */
+  l_usr = strdup(l_str_val);
+  strcpy(p_user, l_usr);
+  log_message("AL Daemon Get Current User : The current user is USER=%s\n", p_user);
+  return 1;
+}
+
+/* Function responsible to start the specific applications for the current user mode */
+void StartUserModeApps(GConfClient *p_client, char *p_user)
+{
+  /* stores the key to acces last user mode list of applications */
+  char *l_last_mode_key = malloc(DIM_MAX*sizeof(l_last_mode_key));
+  /* pointer to the last_mode key */
+  GSList *l_app_list;
+  /* error handler for list get */
+  GError *l_err = NULL;
+  /* index in user mode application list */
+  int l_idx;
+  /* current entry in application list */
+  char *l_app;
+  /* pid for currently started application in the list */
+  int l_app_pid;
+  /* form the specific last_mode key for user */
+  strcpy(l_last_mode_key, "/"); 
+  strcat(l_last_mode_key, p_user);
+  strcat(l_last_mode_key, AL_GCONF_LAST_USER_MODE_KEY);
+  /* get pointer to key (not a copy ) */
+  if((l_app_list = gconf_client_get_list(p_client, (gchar*)l_last_mode_key, GCONF_VALUE_STRING, &l_err)) == NULL){
+        /* test if list is empty */
+        if((gconf_client_get(p_client, (gchar*)l_last_mode_key, NULL)) == NULL){
+		log_message("AL Daemon Start User Mode Apps : Application list for current user mode is empty !%s\n", l_err->message);
+                return;  
+        }else{
+	 	log_message("AL Daemon Start User Mode Apps : Cannot get list from current user key !%s\n", l_err->message);
+     		return;
+        }
+     }
+  /* call run for each entry in the user mode application list */
+  for(l_idx = 0; l_idx<(int)g_slist_length(l_app_list); l_idx++){
+	 /* get app name */
+	 l_app = (char*)g_slist_nth_data(l_app_list, l_idx);
+         /* run application */
+ 	 Run(l_app_pid, true, 0, l_app);
+	 log_message("AL Daemon Start User Mode Apps : Started %s for user %s !\n", l_app, p_user);
+  }
+  log_message("AL Daemon Start User Mode Apps : Last user mode applications for user %s was setup!\n", p_user);
+  /* free the list */
+  g_slist_free(l_app_list);
+}
+
+/* Function responsible to initialize the last user mode at daemon startup */
+void InitializeLastUserMode()
+{
+  /* reference to the GConfClient object */
+  GConfClient* l_client = NULL;
+  /* initialize error */
+  GError* l_error = NULL;
+  /* current user from current_user key */
+  char *l_current_user=malloc(DIM_MAX*sizeof(l_current_user));
+  /* current user key pointer */
+  GConfEntry *l_current_user_key = NULL;
+  /* Last-User-Mode functionality implementation */
+  /* initialize GType system */
+  g_type_init();
+  /* create a new GConfClient object using the default settings. */
+  if(((l_client = gconf_client_get_default()) == NULL)){
+    log_message("AL Daemon Last User Mode Init : Failed to create client for last-user-mode!%s","\n");
+    return;
+  }
+  /* extract entry */
+  if((l_current_user_key = gconf_client_get_entry(l_client, AL_GCONF_CURRENT_USER_KEY, NULL, FALSE, &l_error)) ==  NULL){
+	log_message("AL Daemon Last User Mode Init : Failed to get entry for current user key ! %s!\n",
+            l_error->message);
+    	g_clear_error(&l_error);
+	return; 
+  }
+  /* get the current value for the current_user key */
+  if(!GetCurrentUser(l_client, l_current_user_key, l_current_user)){
+  		log_message("AL Daemon Last User Mode Init : Cannot extract current user !%s","\n");
+   		return;
+  }
+  /* start current user mode applications */
+  StartUserModeApps(l_client, l_current_user);
+  /* free res */
+  g_object_unref(l_client) ;
 }
 
 /* 
@@ -2361,7 +2474,7 @@ int main(int argc, char **argv)
   /* setup a PID and a SID for our AL Interface daemon */
   pid_t l_al_pid, l_al_sid;
   int l_ret;
-
+  
   /* fork off the parent process */
   l_al_pid = fork();
   if (l_al_pid < 0) {
@@ -2397,7 +2510,7 @@ int main(int argc, char **argv)
 
   /* specific initialization code */
   // TODO add specific init calls here if needed
-
+  
   /* main daemon loop */
   AlParseCLIOptions(argc, argv);
 
@@ -2409,6 +2522,9 @@ int main(int argc, char **argv)
 
   if (g_start) {
     fprintf(stdout, "AL Daemon : Daemon process was started !\n");
+   /* initialise the last user mode */
+    InitializeLastUserMode();
+    fprintf(stdout, "AL Daemon : Last user mode initialized. Listening for method calls ....\n");
     AlListenToMethodCall();
   }
 

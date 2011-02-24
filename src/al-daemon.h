@@ -36,6 +36,8 @@
 #define AL_SIGNAME_NOTIFICATION "GlobalStateNotification"
 #define DIM_MAX 200
 #define AL_VERSION "1.1"
+#define AL_GCONF_CURRENT_USER_KEY "/current_user"
+#define AL_GCONF_LAST_USER_MODE_KEY "/last_mode"
 
 /* Tracing support */
 unsigned char g_verbose = 0;
@@ -89,4 +91,10 @@ extern void Restart(char *app_name);
 extern void MapUidToUser(int uid, char *user);
 /* Function responsible to extract the group name from the gid */
 extern void MapGidToGroup(int gid, char *group);
+/* Function responsible to get the current user as specified in the current_user GConf key and start the last user mode apps */
+extern int GetCurrentUser(GConfClient* client, GConfEntry* key, char *user);
+/* Function responsible to start the specific applications for the current user mode */
+extern void StartUserModeApps(GConfClient *client, char *user);
+/* Function responsible to initialize the last user mode at daemon startup */
+extern void InitializeLastUserMode();
 #endif

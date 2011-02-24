@@ -51,6 +51,11 @@ PKG_CHECK_MODULES(GLIB2, [ glib-2.0 ])
 AC_SUBST(GLIB2_CFLAGS)
 AC_SUBST(GLIB2_LIBS)
 
+PKG_CHECK_MODULES(GCONF, [ gconf-2.0 ])
+AC_SUBST(GCONF_CFLAGS)
+AC_SUBST(GCONF_LIBS)
+
+
 # Checks for libraries.
 #AC_CHECK_HEADERS([glib.h],
 #                [],

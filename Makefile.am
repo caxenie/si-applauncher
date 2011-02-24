@@ -10,7 +10,10 @@ al_daemon_CFLAGS = \
 		$(DBUS_LIBS) \
 		$(DBUS_GLIB_FLAGS) \
 		$(GLIB2_CFLAGS) \
-		$(GLIB2_LIBS)
+		$(GLIB2_LIBS) \
+		$(GCONF_LIBS) \
+		$(GCONF_CFLAGS)
+
 # Dirs of external packages
 pkgconfigdatadir=$(datadir)/pkgconfig
 
