@@ -2007,8 +2007,10 @@ void AlListenToMethodCall()
 
 	  /* check the application current state before starting it */
 	  /* extract the application state for testing existence */
+          /* make a copy of the name to avoid additional postfix when calling run */
+          strcpy(l_app_copy, l_app);
 	  if (AlGetAppState
-	      (l_conn, strcat(l_app, ".service"), l_state_info) == 0) {
+	      (l_conn, strcat(l_app_copy, ".service"), l_state_info) == 0) {
 
 	    /* copy the state */
 	    l_app_status = strdup(l_state_info);
@@ -2080,8 +2082,10 @@ void AlListenToMethodCall()
 
 	  /* check the application current state before starting it */
 	  /* extract the application state for testing existence */
+          /* make a copy of the name to avoid additional suffix when calling runas */
+          strcpy(l_app_copy, l_app);
 	  if (AlGetAppState
-	      (l_conn, strcat(l_app, ".service"), l_state_info) == 0) {
+	      (l_conn, strcat(l_app_copy, ".service"), l_state_info) == 0) {
 
 	    /* copy the state */
 	    l_app_status = strdup(l_state_info);
@@ -2133,7 +2137,9 @@ void AlListenToMethodCall()
 
 	/* check the application current state before stopping it */
 	/* extract the application state for testing existence */
-	if (AlGetAppState(l_conn, strcat(l_app, ".service"), l_state_info)
+  	/* make a copy of the name to avoid additional postfix when calling stop */
+        strcpy(l_app_copy, l_app);
+	if (AlGetAppState(l_conn, strcat(l_app_copy, ".service"), l_state_info)
 	    == 0) {
 
 	  /* copy the state */
@@ -2189,7 +2195,9 @@ void AlListenToMethodCall()
 
 	/* check the application current state before stopping it */
 	/* extract the application state for testing existence */
-	if (AlGetAppState(l_conn, strcat(l_app, ".service"), l_state_info)
+        /* make a copy of the name to avoid additional postfix when calling stopas */
+        strcpy(l_app_copy, l_app);
+	if (AlGetAppState(l_conn, strcat(l_app_copy, ".service"), l_state_info)
 	    == 0) {
 
 	  /* copy the state */
@@ -2242,7 +2250,9 @@ void AlListenToMethodCall()
 
 	/* check the application current state before starting it */
 	/* extract the application state for testing existence */
-	if (AlGetAppState(l_conn, strcat(l_app, ".service"), l_state_info)
+        /* make a copy of the name to avoid additional postfix when calling resume */
+        strcpy(l_app_copy, l_app);
+	if (AlGetAppState(l_conn, strcat(l_app_copy, ".service"), l_state_info)
 	    == 0) {
 
 	  /* copy the state */
@@ -2295,7 +2305,9 @@ void AlListenToMethodCall()
 
 	/* check the application current state before starting it */
 	/* extract the application state for testing existence */
-	if (AlGetAppState(l_conn, strcat(l_app, ".service"), l_state_info)
+        /* make a copy of the name to avoid additional suffix when calling suspend */
+        strcpy(l_app_copy, l_app);
+	if (AlGetAppState(l_conn, strcat(l_app_copy, ".service"), l_state_info)
 	    == 0) {
 
 	  /* copy the state */
