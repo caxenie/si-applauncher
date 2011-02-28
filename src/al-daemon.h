@@ -38,6 +38,7 @@
 #define AL_VERSION "1.1"
 #define AL_GCONF_CURRENT_USER_KEY "/current_user"
 #define AL_GCONF_LAST_USER_MODE_KEY "/last_mode"
+#define AL_PID_FILE "/var/run/al-daemon.pid"
 
 /* Tracing support */
 unsigned char g_verbose = 0;
@@ -97,4 +98,8 @@ extern int GetCurrentUser(GConfClient* client, GConfEntry* key, char *user);
 extern void StartUserModeApps(GConfClient *client, char *user);
 /* Function responsible to initialize the last user mode at daemon startup */
 extern void InitializeLastUserMode();
+/* Signal handler for the daemon */
+extern void AlSignalHandler(int sig);
+/* Function responsible with the daemonization procedure */
+extern void AlDaemonize();
 #endif
