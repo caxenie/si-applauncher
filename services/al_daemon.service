@@ -1,12 +1,13 @@
 [Unit]
 Description=Application launcher daemon
-After=dbus.service systemctl_monitor.service
-Requires=dbus.service systemctl_monitor.service
+After=dbus.service
+Requires=dbus.service
 
 [Service]
-Type=simple
-RemainAfterExit=true
-ExecStart=/usr/bin/al-daemon --start
+Type=forking
+RemainAfterExit=yes
+ExecStart=/usr/bin/al-daemon
+PIDFile=/var/run/al-daemon.pid
 
 [Install]
 WantedBy=multi-user.target
