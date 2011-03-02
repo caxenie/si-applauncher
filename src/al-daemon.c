@@ -1816,6 +1816,38 @@ void AlReplyToMethodCall(DBusMessage * p_msg, DBusConnection * p_conn)
 	 l_param);
 }
 
+/*
+  Replies to Introspection request
+  */
+void ReplyToIntrospect(DBusMessage *p_msg, DBusConnection *p_conn)
+{
+    /* reply message */
+    DBusMessage *l_reply;
+    /* reply arguments */
+    DBusMessageIter l_args;
+    dbus_uint32_t l_serial = 0;
+    char * l_introspect_xml = DBUS_SRM_INTROSPECT_XML;
+
+    // create a reply from the message
+    l_reply = dbus_message_new_method_return(p_msg);
+
+    // add the arguments to the reply
+    dbus_message_iter_init_append(l_reply, &l_args);
+    if (!dbus_message_iter_append_basic(&l_args, DBUS_TYPE_STRING, &l_introspect_xml)) {
+        printf("Reply to introspect : Arg String Out Of Memory!\n");
+        exit(1);
+    }
+    // send the reply && flush the connection
+    if (!dbus_connection_send(p_conn, l_reply, &l_serial)) {
+        printf("Reply to introspect : Connection Out Of Memory!\n");
+        exit(1);
+    }
+    dbus_connection_flush(p_conn);
+
+    // free the reply
+    dbus_message_unref(l_reply);
+}
+
 /* Server that exposes a method call and waits for it to be called */
 void AlListenToMethodCall()
 {
@@ -1958,6 +1990,12 @@ void AlListenToMethodCall()
     if (NULL == l_msg) {
       sleep(1);
       continue;
+    }
+
+    if (dbus_message_is_method_call(l_msg,
+                                    "org.freedesktop.DBus.Introspectable",
+                                    "Introspect")) {
+        ReplyToIntrospect(l_msg, l_conn);
     }
 
     /* check if this is a method call for the right interface amd method */

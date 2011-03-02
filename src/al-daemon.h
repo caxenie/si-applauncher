@@ -40,6 +40,69 @@
 #define AL_GCONF_LAST_USER_MODE_KEY "/last_mode"
 #define AL_PID_FILE "/var/run/al-daemon.pid"
 
+#define DBUS_SRM_INTROSPECT_XML "" \
+        "<!DOCTYPE node PUBLIC \"-//freedesktop//DTD "\
+        "D-BUS Object Introspection 1.0//EN\" "\
+        "\"http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd\">\n"\
+        "<node name=\"" SRM_OBJECT_PATH "\">\n"\
+        "  <interface name=\"" AL_METHOD_INTERFACE "\">\n"\
+        "    <method name=\"Run\">\n"\
+        "      <arg name=\"app_name\" type=\"s\" direction=\"in\"/>\n"\
+        "      <arg name=\"status\" type=\"b\" direction=\"out\"/>\n"\
+        "      <arg name=\"level\" type=\"u\" direction=\"out\"/>\n"\
+        "    </method>\n"\
+        "    <method name=\"RunAs\">\n"\
+        "      <arg name=\"app_name\" type=\"s\" direction=\"in\"/>\n"\
+        "      <arg name=\"app_uid\" type=\"i\" direction=\"in\"/>\n"\
+        "      <arg name=\"app_gid\" type=\"i\" direction=\"in\"/>\n"\
+        "      <arg name=\"status\" type=\"b\" direction=\"out\"/>\n"\
+        "      <arg name=\"level\" type=\"u\" direction=\"out\"/>\n"\
+        "    </method>\n"\
+        "    <method name=\"Stop\">\n"\
+        "      <arg name=\"app_name\" type=\"s\" direction=\"in\"/>\n"\
+        "      <arg name=\"status\" type=\"b\" direction=\"out\"/>\n"\
+        "      <arg name=\"level\" type=\"u\" direction=\"out\"/>\n"\
+        "    </method>\n"\
+        "    <method name=\"StopAs\">\n"\
+        "      <arg name=\"app_name\" type=\"s\" direction=\"in\"/>\n"\
+        "      <arg name=\"app_uid\" type=\"i\" direction=\"in\"/>\n"\
+        "      <arg name=\"app_gid\" type=\"i\" direction=\"in\"/>\n"\
+        "      <arg name=\"status\" type=\"b\" direction=\"out\"/>\n"\
+        "      <arg name=\"level\" type=\"u\" direction=\"out\"/>\n"\
+        "    </method>\n"\
+        "    <method name=\"Resume\">\n"\
+        "      <arg name=\"app_name\" type=\"s\" direction=\"in\"/>\n"\
+        "      <arg name=\"status\" type=\"b\" direction=\"out\"/>\n"\
+        "      <arg name=\"level\" type=\"u\" direction=\"out\"/>\n"\
+        "    </method>\n"\
+        "    <method name=\"Suspend\">\n"\
+        "      <arg name=\"app_name\" type=\"s\" direction=\"in\"/>\n"\
+        "      <arg name=\"status\" type=\"b\" direction=\"out\"/>\n"\
+        "      <arg name=\"level\" type=\"u\" direction=\"out\"/>\n"\
+        "    </method>\n"\
+        "    <method name=\"Restart\">\n"\
+        "      <arg name=\"app_name\" type=\"s\" direction=\"in\"/>\n"\
+        "      <arg name=\"status\" type=\"b\" direction=\"out\"/>\n"\
+        "      <arg name=\"level\" type=\"u\" direction=\"out\"/>\n"\
+        "    </method>\n"\
+        "    <method name=\"ChangeTaskState\">\n"\
+        "      <arg name=\"app_pid\" type=\"i\" direction=\"in\"/>\n"\
+        "      <arg name=\"foreground\" type=\"b\" direction=\"in\"/>\n"\
+        "    </method>\n"\
+        "  </interface>\n"\
+        "  <interface name=\"" AL_SIGNAL_INTERFACE "\">\n"\
+        "    <signal name=\"" AL_SIGNAME_NOTIFICATION "\">\n"\
+        "      <arg name=\"app_status\" type=\"s\"/>\n"\
+        "    </signal>\n"\
+        "    <signal name=\"" AL_SIGNAME_TASK_STARTED "\">\n"\
+        "      <arg name=\"app_state\" type=\"s\"/>\n"\
+        "    </signal>\n"\
+        "    <signal name=\"" AL_SIGNAME_TASK_STOPPED "\">\n"\
+        "      <arg name=\"app_state\" type=\"s\"/>\n"\
+        "    </signal>\n"\
+        "  </interface>\n"\
+        "</node>\n"
+
 /* Tracing support */
 unsigned char g_verbose = 0;
 /* CLI commands */
