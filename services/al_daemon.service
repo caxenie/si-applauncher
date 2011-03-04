@@ -1,12 +1,15 @@
 [Unit]
 Description=Application launcher daemon
-After=dbus.service
-Requires=dbus.service
+After=gconf_dbus_session_enable.service
+Requires=gconf_dbus_session_enable.service
 
 [Service]
 Type=forking
 RemainAfterExit=yes
-ExecStart=/usr/bin/al-daemon
+Environment=HOME=/root
+EnvironmentFile=/tmp/.gconf_dbus_session
+ExecStartPre=/bin/systemctl --system daemon-reload
+ExecStart=/usr/bin/al-daemon --start -v
 PIDFile=/var/run/al-daemon.pid
 
 [Install]
