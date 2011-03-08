@@ -253,24 +253,32 @@ int AppNameFromPid(int p_pid, char *p_app_name)
 
 /* 
  * Function responsible to test if a given application exists in the system.
- * It searches for the associated .service file for a string representing a name.
+ * It searches for the associated .service or .target file for a string representing a name.
+ * The target is responsible to implement applications group specific functionality.
+ * The function returns : 1 - service found | 2 - target found | 0 - no unit found for name
  */
 int AppExistsInSystem(char *p_app_name)
 {
   /* full name string */
-  char full_name[DIM_MAX];
+  char full_name_srv[DIM_MAX];
+  char full_name_trg[DIM_MAX];
   /* get the full path name */
-  sprintf(full_name, "/lib/systemd/system/%s.service", p_app_name);
-  /* contains stat info */
+  sprintf(full_name_srv, "/lib/systemd/system/%s.service", p_app_name);
+  sprintf(full_name_trg, "/lib/systemd/system/%s.target", p_app_name);
+  /* contains stat info for service / target */
   struct stat file_stat;
   int ret = -1;
-  /* get stat information */
-  ret = stat(full_name, &file_stat);
-  if (!ret) {
-    /* file exists */
+  /* get stat information for service */
+  if ((ret = stat(full_name_srv, &file_stat))==0) {
+    /* service file was found */
     return 1;
   }
-  /* file not found */
+  /* get stat information for target */
+  if ((ret = stat(full_name_trg, &file_stat))==0) {
+    /* target file was found */
+    return 2;
+  }
+  /* nor service file, nor target file found */
   return 0;
 }
 
@@ -1190,7 +1198,14 @@ void Run(int p_newPID, bool p_isFg, int p_parentPID, char *p_commandLine)
   /* the command line for the application */
   char l_cmd[DIM_MAX];
   /* form the call string for systemd */
-  sprintf(l_cmd, "systemctl start %s.service", p_commandLine);
+  /* check if single service will be started with run */
+  if((AppExistsInSystem(p_commandLine))==1){
+  	sprintf(l_cmd, "systemctl start %s.service", p_commandLine);
+  }
+  /* check if target (group of apps) will be started with run */
+  if((AppExistsInSystem(p_commandLine))==2){
+  	sprintf(l_cmd, "systemctl start %s.target", p_commandLine);
+  }
   /* check if the unit has an associated timer and adjust the call string */
   if (strcmp(p_commandLine, "reboot") == 0) {
     sprintf(l_cmd, "systemctl start %s.timer", p_commandLine);
@@ -1204,9 +1219,16 @@ void Run(int p_newPID, bool p_isFg, int p_parentPID, char *p_commandLine)
   /* systemd invocation */
   l_ret = system(l_cmd);
   if (l_ret == -1) {
+   if((AppExistsInSystem(p_commandLine))==1){
     log_message
 	("AL Daemon Run : Application cannot be started with run! Err: %s\n",
 	 strerror(errno));
+    }
+    if((AppExistsInSystem(p_commandLine))==2){
+    log_message
+	("AL Daemon Run : Applications group cannot be started with run! Err: %s\n",
+	 strerror(errno));
+    }
     return;
   }
   /* extract the PID from the application name only if the start is valid */
@@ -1318,7 +1340,7 @@ void Resume(int p_pid)
   char l_cmd[DIM_MAX];
   log_message("AL Daemon Resume : %s restarted with resume !\n", l_commandLine);
   /* form the systemd command line string */
-  sprintf(l_cmd, "systemctl restart %s.service", l_commandLine);
+  sprintf(l_cmd, "systemctl start %s.service", l_commandLine);
   /* call systemd */
   l_ret = system(l_cmd);
 
@@ -1327,7 +1349,7 @@ void Resume(int p_pid)
 		strerror(errno));
     }
    }else{
-	log_message("AL Daemon Resume : Application %s cannot be resumed because is stopped !\n", l_commandLine); 
+    	log_message("AL Daemon Resume : Application %s cannot be resumed because is already running !\n", l_commandLine); 
  }
 }
 
@@ -1344,16 +1366,20 @@ void Stop(int p_pid)
   char l_cmd[DIM_MAX];
   log_message("AL Daemon Stop : %s stopped with stop !\n", l_commandLine);
   /* form the systemd command line string */
-  sprintf(l_cmd, "systemctl stop %s.service", l_commandLine);
+   /* check if single service will be stopped */
+  if((AppExistsInSystem(l_commandLine))==1){
+  	sprintf(l_cmd, "systemctl stop %s.service", l_commandLine);
+  }
   /* call systemd */
   l_ret = system(l_cmd);
 
   if (l_ret != 0) {
-    log_message("AL Daemon Stop : Application cannot be stopped! Err:%s\n",
-		strerror(errno));
+    log_message
+	("AL Daemon Stop : Application cannot be stopped with stop! Err: %s\n",
+	 strerror(errno));
    }
   }else{
-	log_message("AL Daemon Stop : Application %s cannot be stopped because is already stopped !\n", l_commandLine); 
+    	log_message("AL Daemon Stop : Application %s cannot be stopped because is already stopped !\n", l_commandLine); 
  }
 }
 
@@ -1381,7 +1407,7 @@ void StopAs(int p_pid, int p_euid, int p_egid){
   char l_cmd[DIM_MAX];
   log_message("AL Daemon StopAs : %s stopped with stopas !\n", l_app_name);
   /* form the systemd command line string */
-  sprintf(l_cmd, "systemctl stop %s.service", l_app_name);
+  sprintf(l_cmd, "systemctl stop %s.service", l_commandLine);
   /* test ownership and rights before stopping application */
   ExtractOwnershipInfo(l_user, l_group, l_srv_path);
   log_message("AL Daemon StopAs : The ownership information was extracted properly [ user : %s ] and [ group : %s ]\n", l_user, l_group);
@@ -1400,7 +1426,7 @@ void StopAs(int p_pid, int p_euid, int p_egid){
 		strerror(errno));
    }
   }else{
-	log_message("AL Daemon StopAs : Application %s cannot be stopped because is already stopped !\n", l_commandLine); 
+    	log_message("AL Daemon StopAs : Application %s cannot be stopped because is already stopped !\n", l_commandLine); 
  }
 }
 
@@ -1427,13 +1453,27 @@ void Restart(char *p_app_name)
   /* the command line for the application */
   char l_cmd[DIM_MAX];
   log_message("AL Daemon Restart : %s will be restarted !\n", p_app_name);
-  sprintf(l_cmd, "systemctl restart %s.service", p_app_name);
+   /* check if single service will be restarted */
+  if((AppExistsInSystem(p_app_name))==1){
+  	sprintf(l_cmd, "systemctl restart %s.service", p_app_name);
+  }
+  /* check if target (group of apps) will be restarted */
+  if((AppExistsInSystem(p_app_name))==2){
+  	sprintf(l_cmd, "systemctl restart %s.target", p_app_name);
+  }
   /* systemd invocation */
   l_ret = system(l_cmd);
   if (l_ret != 0) {
+    if((AppExistsInSystem(p_app_name))==1){
     log_message
 	("AL Daemon Restart : Application cannot be restarted with restart! Err: %s\n",
 	 strerror(errno));
+    }
+    if((AppExistsInSystem(p_app_name))==2){
+    log_message
+	("AL Daemon Restart : Applications group cannot be restarted with restart! Err: %s\n",
+	 strerror(errno));
+    }
   }
 } 
 
@@ -2039,15 +2079,15 @@ void AlListenToMethodCall()
 	continue;
       } else {
 	if ((l_r = (int) AppPidFromName(l_app)) != 0) {
-	  log_message
-	      ("AL Daemon Method Call Listener : Cannot run %s !\n",
-	       l_app);
-
+           log_message
+	      ("AL Daemon Method Call Listener : Cannot run %s !\n", l_app);
 	  /* check the application current state before starting it */
 	  /* extract the application state for testing existence */
           /* make a copy of the name to avoid additional postfix when calling run */
-          strcpy(l_app_copy, l_app);
-	  if (AlGetAppState
+	  /* concatenate the appropiate string according the unit type i.e. service/target */
+          if (AppExistsInSystem(l_app)==1){
+           strcpy(l_app_copy, l_app);
+	   if (AlGetAppState
 	      (l_conn, strcat(l_app_copy, ".service"), l_state_info) == 0) {
 
 	    /* copy the state */
@@ -2058,14 +2098,30 @@ void AlListenToMethodCall()
 	    l_active_state = strtok(NULL, l_delim_serv);
 	    l_active_state = strtok(NULL, l_delim_serv);
 	    l_sub_state = strtok(NULL, l_delim_serv);
+	    }
+          }
+	  if (AppExistsInSystem(l_app)==2){
+           strcpy(l_app_copy, l_app);
+	   if (AlGetAppState
+	      (l_conn, strcat(l_app_copy, ".target"), l_state_info) == 0) {
 
-	  }
+	    /* copy the state */
+	    l_app_status = strdup(l_state_info);
+
+	    /* active state extraction from global state info */
+	    l_active_state = strtok(l_app_status, l_delim_serv);
+	    l_active_state = strtok(NULL, l_delim_serv);
+	    l_active_state = strtok(NULL, l_delim_serv);
+	    l_sub_state = strtok(NULL, l_delim_serv);
+	    }
+          }
+           
 	  if (strcmp(l_active_state, "active") == 0) {
 	    if ((strcmp(l_sub_state, "exited") != 0)
 		|| (strcmp(l_sub_state, "dead") != 0)
 		|| (strcmp(l_sub_state, "failed") != 0)) {
 	      log_message
-		  ("AL Daemon Method Call Listener : Cannot run %s !\n Application %s is already running in the system !\n",
+		  ("AL Daemon Method Call Listener : Cannot run %s !\n Application/application group %s is already running in the system !\n",
 		   l_app, l_app);
 	      continue;
 	    }
@@ -2170,14 +2226,14 @@ void AlListenToMethodCall()
 	  continue;
 	}
 	log_message
-	    ("AL Daemon Method Call Listener : Cannot stop %s !\n",
-	     l_app, l_app);
-
+	      ("AL Daemon Method Call Listener : Cannot stop %s !\n", l_app);
 	/* check the application current state before stopping it */
 	/* extract the application state for testing existence */
   	/* make a copy of the name to avoid additional postfix when calling stop */
-        strcpy(l_app_copy, l_app);
-	if (AlGetAppState(l_conn, strcat(l_app_copy, ".service"), l_state_info)
+        /* test if the unit is a service and react according to type */
+	if(AppExistsInSystem(l_app)==1){
+	  strcpy(l_app_copy, l_app);
+          if (AlGetAppState(l_conn, strcat(l_app_copy, ".service"), l_state_info)
 	    == 0) {
 
 	  /* copy the state */
@@ -2188,9 +2244,24 @@ void AlListenToMethodCall()
 	  l_active_state = strtok(NULL, l_delim_serv);
 	  l_active_state = strtok(NULL, l_delim_serv);
 	  l_sub_state = strtok(NULL, l_delim_serv);
-
+          }
 	}
+	/* test if the unit is a target and react according to type */
+	if(AppExistsInSystem(l_app)==2){
+	  strcpy(l_app_copy, l_app);
+          if (AlGetAppState(l_conn, strcat(l_app_copy, ".target"), l_state_info)
+	    == 0) {
 
+	  /* copy the state */
+	  l_app_status = strdup(l_state_info);
+
+	  /* active state extraction from global state info */
+	  l_active_state = strtok(l_app_status, l_delim_serv);
+	  l_active_state = strtok(NULL, l_delim_serv);
+	  l_active_state = strtok(NULL, l_delim_serv);
+	  l_sub_state = strtok(NULL, l_delim_serv);
+          }
+	}
 	if ((strcmp(l_active_state, "active") != 0)
 	    && (strcmp(l_active_state, "reloading") != 0)
 	    && (strcmp(l_active_state, "activating") != 0)
@@ -2202,8 +2273,34 @@ void AlListenToMethodCall()
 	  continue;
 	}
       }
-      /* stop the application */
-      Stop((int) AppPidFromName(l_app));
+       /* test if we have a service that will be stopped */
+       if((AppExistsInSystem(l_app))==1){
+	/* maintains the command line to pass to systemd */
+        char l_cmd[DIM_MAX];
+        /* if the name of the service corresponds to the name of the process to start call Stop */
+        if(AppPidFromName(l_app)!=0){
+		Stop((int)AppPidFromName(l_app));
+	}
+        /* if the name of the service differs from the name of the process to start */
+  	sprintf(l_cmd, "systemctl stop %s.service", l_app);
+	l_ret = system(l_cmd);
+  	if (l_ret != 0) {
+       	log_message
+	      ("AL Daemon Method Call Listener : Cannot stop %s !\n Application %s is already stopped !\n",
+	       l_app, l_app);	
+	}
+      }
+      /* test if we have a target and stop all the applications started by it */
+      if(AppExistsInSystem(l_app)==2){
+	char l_cmd[DIM_MAX];
+	sprintf(l_cmd, "systemctl stop %s.target", l_app);
+	l_ret = system(l_cmd);
+  	if (l_ret != 0) {
+       	log_message
+	      ("AL Daemon Method Call Listener : Cannot stop %s !\n Application group %s is already stopped !\n",
+	       l_app, l_app);	
+	}
+      }
     }
 
      /* check if this is a method call for the right interface amd method */
@@ -2228,9 +2325,7 @@ void AlListenToMethodCall()
 	  continue;
 	}
 	log_message
-	    ("AL Daemon Method Call Listener : Cannot stopas %s !\n",
-	     l_app, l_app);
-
+	      ("AL Daemon Method Call Listener : Cannot stopas %s !\n", l_app);
 	/* check the application current state before stopping it */
 	/* extract the application state for testing existence */
         /* make a copy of the name to avoid additional postfix when calling stopas */
@@ -2282,10 +2377,8 @@ void AlListenToMethodCall()
 	       l_app, l_app);
 	  continue;
 	}
-	log_message
-	    ("AL Daemon Method Call Listener : Cannot resume %s !\n",
-	     l_app, l_app);
-
+        log_message
+	      ("AL Daemon Method Call Listener : Cannot resume %s !\n", l_app);
 	/* check the application current state before starting it */
 	/* extract the application state for testing existence */
         /* make a copy of the name to avoid additional postfix when calling resume */
@@ -2338,9 +2431,7 @@ void AlListenToMethodCall()
 	  continue;
 	}
 	log_message
-	    ("AL Daemon Method Call Listener : Cannot suspend %s !\n",
-	     l_app, l_app);
-
+	      ("AL Daemon Method Call Listener : Cannot suspend %s !\n ", l_app);
 	/* check the application current state before starting it */
 	/* extract the application state for testing existence */
         /* make a copy of the name to avoid additional suffix when calling suspend */
