@@ -1336,7 +1336,6 @@ void Stop(int p_pid)
   }
   /* call systemd */
   l_ret = system(l_cmd);
-
   if (l_ret != 0) {
     log_message
 	("AL Daemon Stop : Application cannot be stopped with stop! Err: %s\n",
@@ -1762,35 +1761,66 @@ void AlReplyToMethodCall(DBusMessage * p_msg, DBusConnection * p_conn)
   /* reply status */
   dbus_uint32_t l_level = 21614;
   dbus_uint32_t l_serial = 0;
-  /* initialized parameter */
+  /* initialized parameters */
   char *l_param = "";
+  int l_param_int = 0;
+  /* arg type switch according to api call parameters */
+  bool l_name_switch = false, l_pid_switch = false;
 
   /* read the arguments */
   if (!dbus_message_iter_init(p_msg, &l_args)) {
     log_message
 	("AL Daemon Reply to Method Call : Message has no arguments!%s",
 	 "\n");
-  } else if (DBUS_TYPE_STRING != dbus_message_iter_get_arg_type(&l_args)) {
-    log_message
-	("AL Daemon Reply to Method Call : Argument is not string!%s",
-	 "\n");
-  } else {
-    dbus_message_iter_get_basic(&l_args, &l_param);
-    log_message
+  } else{ 
+ 
+  if ((DBUS_TYPE_STRING == dbus_message_iter_get_arg_type(&l_args))) {
+     /* get argument from the message (app name)*/
+     dbus_message_iter_get_basic(&l_args, &l_param);
+     /* setup the arg type switch */
+     l_name_switch = true;
+     log_message
 	("AL Daemon Reply to Method Call : Method called for %s\n",
 	 l_param);
+  }else if ((DBUS_TYPE_UINT32 == dbus_message_iter_get_arg_type(&l_args))) {
+     /* get argument from the message (app pid)*/
+    dbus_message_iter_get_basic(&l_args, &l_param_int);
+   /* setup the arg type switch */
+     l_pid_switch = true;
+     log_message
+	("AL Daemon Reply to Method Call : Method called for %d\n",
+	 l_param_int);
   }
-
+  else{
+     log_message
+	("AL Daemon Reply to Method Call : Argument is not string nor an int !%s",
+	 "\n");
+     }
+  }
   /* create a reply from the message */
   l_reply = dbus_message_new_method_return(p_msg);
-  log_message
-	("AL Daemon Reply to Method Call : Reply created for %s\n",
-	 l_param);
+  if(l_name_switch){
+	  log_message
+		("AL Daemon Reply to Method Call : Reply created for %s\n",
+		 l_param);
+  }
+  if(l_pid_switch){
+	 log_message
+		("AL Daemon Reply to Method Call : Reply created for %d\n",
+		 l_param_int);
+  }
   /* add the arguments to the reply */
   dbus_message_iter_init_append(l_reply, &l_args);
-  log_message
-	("AL Daemon Reply to Method Call : Args iter appended for %s\n",
-	 l_param);
+  if(l_name_switch){
+	  log_message
+		("AL Daemon Reply to Method Call : Args iter appended for application %s\n",
+		 l_param);
+  }
+  if(l_pid_switch){
+	 log_message
+		("AL Daemon Reply to Method Call : Args iter appended for application with pid %d\n",
+		 l_param_int);
+  }
   if (!dbus_message_iter_append_basic(&l_args, DBUS_TYPE_BOOLEAN, &l_stat)) {
     log_message
 	("AL Daemon Reply to Method Call : Arg Bool Out Of Memory!%s",
@@ -1815,9 +1845,16 @@ void AlReplyToMethodCall(DBusMessage * p_msg, DBusConnection * p_conn)
 
   /* free the reply */
   dbus_message_unref(l_reply);
-  log_message
-	("AL Daemon Reply to Method Call : Reply sent for %s\n",
-	 l_param);
+  if(l_name_switch){
+	  log_message
+		("AL Daemon Reply to Method Call : Reply sent for application %s\n",
+		 l_param);
+  }
+  if(l_pid_switch){
+	 log_message
+		("AL Daemon Reply to Method Call : Reply sent for application with pid %d\n",
+		 l_param_int);
+  }
 }
 
 /*
@@ -1864,7 +1901,7 @@ void AlListenToMethodCall()
   /* return code */
   int l_ret, l_r;
   /* auxiliary storage for name handling */
-  char *l_app;
+  char *l_app = malloc(DIM_MAX*sizeof(l_app));
   /* application arguments */
   char *l_app_args;
   char *l_app_name;
@@ -2175,13 +2212,14 @@ void AlListenToMethodCall()
     if (dbus_message_is_method_call(l_msg, AL_METHOD_INTERFACE, "Stop")) {
       AlReplyToMethodCall(l_msg, l_conn);
       /* extract application name */
-      dbus_message_get_args(l_msg, &l_err, DBUS_TYPE_STRING,
-			    &l_app, DBUS_TYPE_INVALID);
+      dbus_message_get_args(l_msg, &l_err, DBUS_TYPE_UINT32,
+			    &l_pid, DBUS_TYPE_INVALID);
+      /* extract application name from pid */
+      l_r = (int) AppNameFromPid(l_pid, l_app);
       log_message
-	  ("AL Daemon Method Call Listener : Stopping application %s\n",
-	   l_app);
-      /* extract application pid from its name */
-      if (!(l_r = (int) AppPidFromName(l_app))) {
+	  ("AL Daemon Method Call Listener : Stopping application with pid %d\n",
+	   l_pid);
+      if (l_r!=1) {
 	/* test for application service file existence */
 	if (!AppExistsInSystem(l_app)) {
 	  log_message
@@ -2226,6 +2264,7 @@ void AlListenToMethodCall()
 	  l_sub_state = strtok(NULL, l_delim_serv);
           }
 	}
+        /* state testing */
 	if ((strcmp(l_active_state, "active") != 0)
 	    && (strcmp(l_active_state, "reloading") != 0)
 	    && (strcmp(l_active_state, "activating") != 0)
@@ -2243,9 +2282,10 @@ void AlListenToMethodCall()
         char l_cmd[DIM_MAX];
         /* if the name of the service corresponds to the name of the process to start call Stop */
         if(AppPidFromName(l_app)!=0){
-		Stop((int)AppPidFromName(l_app));
+		Stop(l_pid);
 	}
-        /* if the name of the service differs from the name of the process to start */
+        /* if the name of the service differs from the name of the process 
+           to start (multiple ExecStart clauses service )*/
   	sprintf(l_cmd, "systemctl stop %s.service", l_app);
 	l_ret = system(l_cmd);
   	if (l_ret != 0) {
@@ -2272,15 +2312,16 @@ void AlListenToMethodCall()
       AlReplyToMethodCall(l_msg, l_conn);
       /* extract application name */
       dbus_message_get_args(l_msg, &l_err, 
-                            DBUS_TYPE_STRING, &l_app,
+                            DBUS_TYPE_UINT32, &l_pid,
  			    DBUS_TYPE_INT32, &l_uid_val,
  			    DBUS_TYPE_INT32, &l_gid_val,
 			    DBUS_TYPE_INVALID);
+      /* extract application name from pid */
+      l_r = (int) AppNameFromPid(l_pid, l_app);
       log_message
-	  ("AL Daemon Method Call Listener : Stopping application %s with stopas !\n",
-	   l_app);
-      /* extract application pid from its name */
-      if (!(l_r = (int) AppPidFromName(l_app))) {
+	  ("AL Daemon Method Call Listener : Stopping application with pid %d using stopas !\n",
+	   l_pid);
+      if (l_r!=1) {
 	/* test for application service file existence */
 	if (!AppExistsInSystem(l_app)) {
 	  log_message
@@ -2307,7 +2348,7 @@ void AlListenToMethodCall()
 	  l_sub_state = strtok(NULL, l_delim_serv);
 
 	}
-
+        /* state testing */
 	if ((strcmp(l_active_state, "active") != 0)
 	    && (strcmp(l_active_state, "reloading") != 0)
 	    && (strcmp(l_active_state, "activating") != 0)
@@ -2320,20 +2361,21 @@ void AlListenToMethodCall()
 	}
       }
       /* stopas the application */
-      StopAs((int) AppPidFromName(l_app), l_uid_val, l_gid_val);
+      StopAs(l_pid, l_uid_val, l_gid_val);
     }
 
     /* check if this is a method call for the right interface amd method */
     if (dbus_message_is_method_call(l_msg, AL_METHOD_INTERFACE, "Resume")) {
       AlReplyToMethodCall(l_msg, l_conn);
       /* extract the application name */
-      dbus_message_get_args(l_msg, &l_err, DBUS_TYPE_STRING,
-			    &l_app, DBUS_TYPE_INVALID);
+      dbus_message_get_args(l_msg, &l_err, DBUS_TYPE_UINT32,
+			    &l_pid, DBUS_TYPE_INVALID);
+      /* extract application name from pid */
+      l_r = (int) AppNameFromPid(l_pid, l_app);
       log_message
 	  ("AL Daemon Method Call Listener : Resuming application %s\n",
 	   l_app);
-      /* extract the application pid from its name */
-      if (!(l_r = (int) AppPidFromName(l_app))) {
+      if (l_r!=1) {
 	/* test for application service file existence */
 	if (!AppExistsInSystem(l_app)) {
 	  log_message
@@ -2373,20 +2415,21 @@ void AlListenToMethodCall()
 	}
       }
       /* resume the application */
-      Resume((int) AppPidFromName(l_app));
+      Resume(l_pid);
     }
 
     /* check if this is a method call for the right interface amd method */
     if (dbus_message_is_method_call(l_msg, AL_METHOD_INTERFACE, "Suspend")) {
       AlReplyToMethodCall(l_msg, l_conn);
       /* extract the application name */
-      dbus_message_get_args(l_msg, &l_err, DBUS_TYPE_STRING,
-			    &l_app, DBUS_TYPE_INVALID);
+      dbus_message_get_args(l_msg, &l_err, DBUS_TYPE_UINT32,
+			    &l_pid, DBUS_TYPE_INVALID);
+      /* extract application name from pid */
+      l_r = (int) AppNameFromPid(l_pid, l_app);
       log_message
 	  ("AL Daemon Method Call Listener : Suspending application %s\n",
 	   l_app);
-      /* extract the application pid from its name */
-      if (!(l_r = (int) AppPidFromName(l_app))) {
+      if (l_r!=1) {
 	/* test for application service file existence */
 	if (!AppExistsInSystem(l_app)) {
 	  log_message
@@ -2426,7 +2469,7 @@ void AlListenToMethodCall()
 	}
       }
       /* suspend the application */
-      Suspend((int) AppPidFromName(l_app));
+      Suspend(l_pid);
     }
 
    /* check if this is a method call for the right interface amd method */
