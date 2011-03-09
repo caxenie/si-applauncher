@@ -1299,58 +1299,22 @@ void RunAs(int p_egid, int p_euid, int p_newPID, bool p_isFg, int p_parentPID,
 
 void Suspend(int p_pid)
 {
-  /* store the return code */
+  /* return code */
   int l_ret;
-  /* stores the application name */
-  char l_app_name[DIM_MAX];
-
-  /* command line for the application */
-  char *l_commandLine;
-  /* extract the application name from the pid */
-  if(AppNameFromPid(p_pid, l_app_name)!=0){
-  l_commandLine = l_app_name;
-  char l_cmd[DIM_MAX];
-  log_message("AL Daemon Suspend : %s canceled with suspend !\n", l_commandLine);
-  /* form the systemd command line string */
-  sprintf(l_cmd, "systemctl cancel %s.service", l_commandLine);
-  /* call systemd */
-  l_ret = system(l_cmd);
-
-  if (l_ret == -1) {
-    log_message
-	("AL Daemon Suspend : Application cannot be suspended! Err:%s\n",
-	 strerror(errno));
+  /* to suspend the application a SIGSTOP signal is sent */
+  if((l_ret=kill(p_pid, SIGSTOP))==-1){
+	log_message("AL Daemon Suspend : %s cannot be suspended ! Err : %s\n", p_pid, strerror(errno));
    }
-  }else{
-	log_message("AL Daemon Suspend : Application %s cannot be suspended because is already stopped !\n", l_commandLine); 
- }
 }
 
 void Resume(int p_pid)
 {
-  /* store the return code */
+   /* return code */
   int l_ret;
-  /* stores the application name */
-  char l_app_name[DIM_MAX];
-  /* command line for the application */
-  char *l_commandLine;
-  /* extract the application name from the pid */
-  if(AppNameFromPid(p_pid, l_app_name)!=0){
-  l_commandLine = l_app_name;
-  char l_cmd[DIM_MAX];
-  log_message("AL Daemon Resume : %s restarted with resume !\n", l_commandLine);
-  /* form the systemd command line string */
-  sprintf(l_cmd, "systemctl start %s.service", l_commandLine);
-  /* call systemd */
-  l_ret = system(l_cmd);
-
-  if (l_ret == -1) {
-    log_message("AL Daemon Resume : Application cannot be resumed! Err:%s\n",
-		strerror(errno));
-    }
-   }else{
-    	log_message("AL Daemon Resume : Application %s cannot be resumed because is already running !\n", l_commandLine); 
- }
+  /* to suspend the application a SIGSTOP signal is sent */
+  if((l_ret=kill(p_pid, SIGCONT))==-1){
+	log_message("AL Daemon Resume : %s cannot be resumed ! Err : %s\n", p_pid, strerror(errno));
+   }
 }
 
 void Stop(int p_pid)
