@@ -1407,6 +1407,12 @@ void TaskStopped(char *p_imagePath, int p_pid)
        p_pid, p_imagePath, AL_SIGNAME_TASK_STOPPED);
 }
 
+void ChangeTaskState(int p_pid, bool p_isFg)
+{
+  /* change the state of the application given by pid */
+ log_message("AL Daemon ChangeTaskState : Function Not Implemented [%d | %s]\n", p_pid, p_isFg);
+}
+
 /* Function responsible with restarting an application when the SHM component detects
  * an abnormal operation of the application
  */

@@ -24,12 +24,11 @@
 
 /* Application Launcher DBus interface */
 #define AL_DBUS_SERVICE "org.GENIVI.AppL"
-#define AL_CALLER_NAME "org.GENIVI.AppL.caller"
-#define AL_SERVER_NAME "org.GENIVI.AppL.server"
+#define AL_SERVER_NAME "org.GENIVI.AppL"
 #define AL_SIG_TRIGGER "org.GENIVI.AppL"
 #define AL_SIG_LISTENER "org.GENIVI.AppL"
-#define AL_METHOD_INTERFACE "org.GENIVI.AppL.method"
-#define AL_SIGNAL_INTERFACE "org.GENIVI.AppL.signal"
+#define AL_METHOD_INTERFACE "org.GENIVI.AppL"
+#define AL_SIGNAL_INTERFACE "org.GENIVI.AppL"
 #define SRM_OBJECT_PATH "/org/GENIVI/AppL"
 #define AL_SIGNAME_TASK_STARTED "TaskStarted"
 #define AL_SIGNAME_TASK_STOPPED "TaskStopped"
@@ -127,6 +126,7 @@ extern void Suspend(int pid);
 extern void Resume(int pid);
 extern void Stop(int pid);
 extern void StopAs(int pid, int euid, int egid);
+extern void ChangeTaskState(int pid, bool isFg);
 /* Send start/stop signals over the bus to the clients */
 extern void TaskStarted(char *imagePath, int pid);
 extern void TaskStopped(char *imagePath, int pid);
