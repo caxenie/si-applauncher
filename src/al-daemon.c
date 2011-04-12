@@ -1598,9 +1598,6 @@ void AlSendAppSignal(DBusConnection * p_conn, char *p_app_name)
   /* extract the argument as a basic type */
   dbus_message_iter_get_basic(&l_sub_iter, &l_pid);
 
-  /* FIXME adjust the pid after extracting it from ExecMainPID */
-  l_pid = l_pid + 1;
-
   /* unreference the message */
   dbus_message_unref(l_msg);
 
