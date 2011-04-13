@@ -650,7 +650,7 @@ int GetCurrentUser(GConfClient* p_client, GConfEntry *p_key, char *p_user)
 }
 
 /* Function responsible to start the specific applications for the current user mode */
-void StartUserModeApps(GConfClient *p_client, char *p_user)
+int StartUserModeApps(GConfClient *p_client, char *p_user)
 {
   /* stores the key to acces last user mode list of applications */
   char *l_last_mode_key = malloc(DIM_MAX*sizeof(l_last_mode_key));
@@ -664,6 +664,18 @@ void StartUserModeApps(GConfClient *p_client, char *p_user)
   char *l_app;
   /* pid for currently started application in the list */
   int l_app_pid;
+  /* test user existence in gconftree file */
+  if(p_user==NULL){
+	log_message("AL Daemon Start User Mode Apps : The gconftree file doesn't exist or the user was not created !\n Skipping last user mode application startup !%s","\n");
+	goto free_res;
+	return 0;
+  }
+  /* test client validity */
+  if(p_client==NULL){
+	log_message("AL Daemon Start User Mode Apps : The gconf client is not valid !\n Skipping last user mode application startup !%s","\n");
+	goto free_res;
+	return 0;
+  }
   /* form the specific last_mode key for user */
   strcpy(l_last_mode_key, "/"); 
   strcat(l_last_mode_key, p_user);
@@ -673,10 +685,12 @@ void StartUserModeApps(GConfClient *p_client, char *p_user)
         /* test if list is empty */
         if((gconf_client_get(p_client, (gchar*)l_last_mode_key, NULL)) == NULL){
 		log_message("AL Daemon Start User Mode Apps : Application list for current user mode is empty !%s\n", l_err->message);
-                return;  
+		goto free_res;
+                return 0;  
         }else{
 	 	log_message("AL Daemon Start User Mode Apps : Cannot get list from current user key !%s\n", l_err->message);
-     		return;
+		goto free_res;
+     		return 0;
         }
      }
   /* call run for each entry in the user mode application list */
@@ -688,12 +702,14 @@ void StartUserModeApps(GConfClient *p_client, char *p_user)
 	 log_message("AL Daemon Start User Mode Apps : Started %s for user %s !\n", l_app, p_user);
   }
   log_message("AL Daemon Start User Mode Apps : Last user mode applications for user %s was setup!\n", p_user);
-  /* free the list */
-  g_slist_free(l_app_list);
+   g_slist_free(l_app_list);
+free_res:
+	if(l_app_list)  g_slist_free(l_app_list);
+  return 1;
 }
 
 /* Function responsible to initialize the last user mode at daemon startup */
-void InitializeLastUserMode()
+int InitializeLastUserMode()
 {
   /* reference to the GConfClient object */
   GConfClient* l_client = NULL;
@@ -709,24 +725,33 @@ void InitializeLastUserMode()
   /* create a new GConfClient object using the default settings. */
   if(((l_client = gconf_client_get_default()) == NULL)){
     log_message("AL Daemon Last User Mode Init : Failed to create client for last-user-mode!%s","\n");
-    return;
+    goto free_res;
+    return 0;
   }
   /* extract entry */
   if((l_current_user_key = gconf_client_get_entry(l_client, AL_GCONF_CURRENT_USER_KEY, NULL, FALSE, &l_error)) ==  NULL){
 	log_message("AL Daemon Last User Mode Init : Failed to get entry for current user key ! %s!\n",
             l_error->message);
     	g_clear_error(&l_error);
-	return; 
+	goto free_res;
+	return 0; 
   }
   /* get the current value for the current_user key */
   if(!GetCurrentUser(l_client, l_current_user_key, l_current_user)){
   		log_message("AL Daemon Last User Mode Init : Cannot extract current user !%s","\n");
-   		return;
+ 		goto free_res;
+   		return 0;
   }
   /* start current user mode applications */
-  StartUserModeApps(l_client, l_current_user);
-  /* free res */
-  g_object_unref(l_client) ;
+  if(!StartUserModeApps(l_client, l_current_user)){
+	log_message("AL Daemon Last User Mode Init : Cannot start user mode applications !%s","\n");
+		goto free_res;
+   		return 0;
+  }
+   g_object_unref(l_client) ;
+free_res:
+  if(l_client) g_object_unref(l_client) ;
+  return 1;
 }
 
 /* 
@@ -2709,7 +2734,8 @@ void AlDaemonShutdown(){
 /* application launcher daemon entrypoint */
 int main(int argc, char **argv)
 {
-   
+  /* return code */
+  int l_ret;
   /* handle signals */
   signal(SIGTERM, AlSignalHandler);
   signal(SIGKILL, AlSignalHandler);
@@ -2727,8 +2753,11 @@ int main(int argc, char **argv)
     AlDaemonize();
     log_message("AL Daemon : Daemon process was started !%s","\n");
     /* initialise the last user mode */
-    InitializeLastUserMode();
-    log_message("AL Daemon : Last user mode initialized. Listening for method calls ....%s","\n");
+    if(!(l_ret=InitializeLastUserMode())){
+      log_message("AL Daemon : Last user mode initialization failed !%s","\n");
+    }
+    else { log_message("AL Daemon : Last user mode initialized. Listening for method calls ....%s","\n");
+    }
     /* start main daemon loop */
     AlListenToMethodCall();
   }

@@ -158,9 +158,9 @@ extern void MapGidToGroup(int gid, char *group);
 /* Function responsible to get the current user as specified in the current_user GConf key and start the last user mode apps */
 extern int GetCurrentUser(GConfClient* client, GConfEntry* key, char *user);
 /* Function responsible to start the specific applications for the current user mode */
-extern void StartUserModeApps(GConfClient *client, char *user);
+extern int StartUserModeApps(GConfClient *client, char *user);
 /* Function responsible to initialize the last user mode at daemon startup */
-extern void InitializeLastUserMode();
+extern int InitializeLastUserMode();
 /* Signal handler for the daemon */
 extern void AlSignalHandler(int sig);
 /* Function responsible with the daemonization procedure */
