@@ -34,7 +34,7 @@
 #define AL_SIGNAME_TASK_STOPPED "TaskStopped"
 #define AL_SIGNAME_NOTIFICATION "GlobalStateNotification"
 #define DIM_MAX 200
-#define AL_VERSION "1.2"
+#define AL_VERSION "1.3"
 #define AL_GCONF_CURRENT_USER_KEY "/current_user"
 #define AL_GCONF_LAST_USER_MODE_KEY "/last_mode"
 #define AL_PID_FILE "/var/run/al-daemon.pid"
@@ -47,6 +47,7 @@
         "  <interface name=\"" AL_METHOD_INTERFACE "\">\n"\
         "    <method name=\"Run\">\n"\
         "      <arg name=\"app_name\" type=\"s\" direction=\"in\"/>\n"\
+	"      <arg name=\"foreground\" type=\"b\" direction=\"in\"/>\n"\
         "      <arg name=\"status\" type=\"b\" direction=\"out\"/>\n"\
         "      <arg name=\"level\" type=\"u\" direction=\"out\"/>\n"\
         "    </method>\n"\
@@ -54,28 +55,29 @@
         "      <arg name=\"app_name\" type=\"s\" direction=\"in\"/>\n"\
         "      <arg name=\"app_uid\" type=\"i\" direction=\"in\"/>\n"\
         "      <arg name=\"app_gid\" type=\"i\" direction=\"in\"/>\n"\
+	"      <arg name=\"foreground\" type=\"b\" direction=\"in\"/>\n"\
         "      <arg name=\"status\" type=\"b\" direction=\"out\"/>\n"\
         "      <arg name=\"level\" type=\"u\" direction=\"out\"/>\n"\
         "    </method>\n"\
         "    <method name=\"Stop\">\n"\
-        "      <arg name=\"app_name\" type=\"s\" direction=\"in\"/>\n"\
+        "      <arg name=\"app_pid\" type=\"u\" direction=\"in\"/>\n"\
         "      <arg name=\"status\" type=\"b\" direction=\"out\"/>\n"\
         "      <arg name=\"level\" type=\"u\" direction=\"out\"/>\n"\
         "    </method>\n"\
         "    <method name=\"StopAs\">\n"\
-        "      <arg name=\"app_name\" type=\"s\" direction=\"in\"/>\n"\
+        "      <arg name=\"app_pid\" type=\"u\" direction=\"in\"/>\n"\
         "      <arg name=\"app_uid\" type=\"i\" direction=\"in\"/>\n"\
         "      <arg name=\"app_gid\" type=\"i\" direction=\"in\"/>\n"\
         "      <arg name=\"status\" type=\"b\" direction=\"out\"/>\n"\
         "      <arg name=\"level\" type=\"u\" direction=\"out\"/>\n"\
         "    </method>\n"\
         "    <method name=\"Resume\">\n"\
-        "      <arg name=\"app_name\" type=\"s\" direction=\"in\"/>\n"\
+        "      <arg name=\"app_pid\" type=\"u\" direction=\"in\"/>\n"\
         "      <arg name=\"status\" type=\"b\" direction=\"out\"/>\n"\
         "      <arg name=\"level\" type=\"u\" direction=\"out\"/>\n"\
         "    </method>\n"\
         "    <method name=\"Suspend\">\n"\
-        "      <arg name=\"app_name\" type=\"s\" direction=\"in\"/>\n"\
+        "      <arg name=\"app_pid\" type=\"u\" direction=\"in\"/>\n"\
         "      <arg name=\"status\" type=\"b\" direction=\"out\"/>\n"\
         "      <arg name=\"level\" type=\"u\" direction=\"out\"/>\n"\
         "    </method>\n"\
@@ -87,6 +89,8 @@
         "    <method name=\"ChangeTaskState\">\n"\
         "      <arg name=\"app_pid\" type=\"i\" direction=\"in\"/>\n"\
         "      <arg name=\"foreground\" type=\"b\" direction=\"in\"/>\n"\
+	"      <arg name=\"status\" type=\"b\" direction=\"out\"/>\n"\
+        "      <arg name=\"level\" type=\"u\" direction=\"out\"/>\n"\
         "    </method>\n"\
         "  </interface>\n"\
         "  <interface name=\"" AL_SIGNAL_INTERFACE "\">\n"\

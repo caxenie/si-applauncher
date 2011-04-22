@@ -1219,6 +1219,8 @@ void Run(int p_newPID, bool p_isFg, int p_parentPID, char *p_commandLine)
   int l_ret;
   /* application PID */
   int l_pid;
+  /* state string */
+  char *l_flag = malloc(DIM_MAX*sizeof(l_flag));
   log_message("AL Daemon Run : %s started with run !\n", p_commandLine);
   /* the command line for the application */
   char l_cmd[DIM_MAX];
@@ -1241,6 +1243,13 @@ void Run(int p_newPID, bool p_isFg, int p_parentPID, char *p_commandLine)
   if (strcmp(p_commandLine, "poweroff") == 0) {
     sprintf(l_cmd, "systemctl start %s.timer", p_commandLine);
   }
+  
+  /* test application state */
+  if(p_isFg==true) strcpy(l_flag,"foreground");
+  else strcpy(l_flag,"background");
+  /* change the state of the application given by pid */
+  log_message("AL Daemon Run : Application with pid %d will run in %s \n", (int)AppPidFromName(p_commandLine), l_flag);
+
   /* systemd invocation */
   l_ret = system(l_cmd);
   if (l_ret == -1) {
@@ -1279,6 +1288,8 @@ void RunAs(int p_egid, int p_euid, int p_newPID, bool p_isFg, int p_parentPID,
   char l_cmd[DIM_MAX];
   /* the service file path */
   char l_srv_path[DIM_MAX];
+  /* string that will store the state */
+  char *l_flag = malloc(DIM_MAX*sizeof(l_flag));
   sprintf(l_srv_path, "/lib/systemd/system/%s.service", p_commandLine);
   /* form the call string for systemd */
   sprintf(l_cmd, "systemctl start %s.service", p_commandLine);
@@ -1308,6 +1319,12 @@ void RunAs(int p_egid, int p_euid, int p_newPID, bool p_isFg, int p_parentPID,
 	 strerror(errno));
      return;
   }
+  /* test application state */
+  if(p_isFg==true) strcpy(l_flag,"foreground");
+  else strcpy(l_flag,"background");
+  /* change the state of the application given by pid */
+  log_message("AL Daemon Run : Application with pid %d will runas %s in %s \n", l_user, (int)AppPidFromName(p_commandLine), l_flag);
+
   /* systemd invocation */
   l_ret = system(l_cmd);
   if (l_ret == -1) {
@@ -1434,8 +1451,79 @@ void TaskStopped(char *p_imagePath, int p_pid)
 
 void ChangeTaskState(int p_pid, bool p_isFg)
 {
+  char *l_flag = malloc(DIM_MAX*sizeof(l_flag));
+  if(p_isFg==true) strcpy(l_flag,"foreground");
+  else strcpy(l_flag,"background");
   /* change the state of the application given by pid */
- log_message("AL Daemon ChangeTaskState : Function Not Implemented [%d | %s]\n", p_pid, p_isFg);
+ log_message("AL Daemon ChangeTaskState : Application with pid %d changed state to %s \n", p_pid, l_flag);
+}
+
+/* 
+ * Function responsible to issue a notification after a task chnages state (fg/bg) 
+ */
+void AlChangeTaskStateNotifier(DBusConnection *p_conn, char *p_app_name, char *p_app_state)
+{
+
+  /* message to be sent */
+  DBusMessage *l_msg;
+  /* message arguments */
+  DBusMessageIter l_args;
+  /* return code */
+  int l_ret;
+  /* reply information */
+  dbus_uint32_t l_serial = 0;
+
+  log_message
+      ("AL Daemon Send ChangeTaskStateComplete Notification : Sending signal for application %s with state %s \n", p_app_name, p_app_state);
+
+    /* create a signal for fg/bg state notification & check for errors */
+    l_msg = dbus_message_new_signal(SRM_OBJECT_PATH,
+				    AL_SIGNAL_INTERFACE,
+				    "ChangeTaskStateComplete");
+
+    /* check errors on message to be sent */
+    if (NULL == l_msg) {
+      log_message("AL Daemon Send ChangeTaskStateComplete Notification for %s : Message Null\n",
+		  p_app_name);
+      return;
+    }
+    log_message
+	("AL Daemon Send ChangeTaskStateComplete Notification : Appending state arguments for %s\n",
+	 p_app_name);
+
+    /* append arguments to the message (signal) */
+    dbus_message_iter_init_append(l_msg, &l_args);
+    log_message
+	("AL Daemon Send ChangeTaskStateComplete Notification : Initialized iterator for appending message arguments at end for %s\n",
+	 p_app_name);
+    /* append status (fg/bg) information encoded in a string */
+    if (!dbus_message_iter_append_basic
+	(&l_args, DBUS_TYPE_STRING, &p_app_name)) {
+      log_message
+	  ("AL Daemon Send ChangeTaskStateComplete Notification : Could not append app name for %s!\n", p_app_name);
+    }
+    if (!dbus_message_iter_append_basic
+	(&l_args, DBUS_TYPE_STRING, &p_app_state)) {
+
+      log_message
+	  ("AL Daemon Send ChangeTaskStateComplete Notification : Could not append app state for %s!\n", p_app_name);
+    }
+    log_message
+	("AL Daemon Send ChangeTaskStateComplete Notification : Sending the state message for %s\n",
+	 p_app_name);
+
+    /* send the message and flush the connection */
+    if (!dbus_connection_send(p_conn, l_msg, &l_serial)) {
+      log_message
+	  ("AL Daemon Send ChangeTaskStateComplete Notification for %s: Connection Out Of Memory!\n",
+	   p_app_name);
+    }
+
+    log_message("AL Daemon Send ChangeTaskStateComplete Notification for %s: Signal Sent\n",
+		p_app_name);
+
+  /* free the message */
+  dbus_message_unref(l_msg);
 }
 
 /* Function responsible with restarting an application when the SHM component detects
@@ -1794,7 +1882,6 @@ void AlReplyToMethodCall(DBusMessage * p_msg, DBusConnection * p_conn)
   int l_param_int = 0;
   /* arg type switch according to api call parameters */
   bool l_name_switch = false, l_pid_switch = false;
-
   /* read the arguments */
   if (!dbus_message_iter_init(p_msg, &l_args)) {
     log_message
@@ -1811,15 +1898,22 @@ void AlReplyToMethodCall(DBusMessage * p_msg, DBusConnection * p_conn)
 	("AL Daemon Reply to Method Call : Method called for %s\n",
 	 l_param);
   }else if ((DBUS_TYPE_UINT32 == dbus_message_iter_get_arg_type(&l_args))) {
-     /* get argument from the message (app pid)*/
+   /* get argument from the message (app pid)*/
     dbus_message_iter_get_basic(&l_args, &l_param_int);
    /* setup the arg type switch */
      l_pid_switch = true;
      log_message
 	("AL Daemon Reply to Method Call : Method called for %d\n",
 	 l_param_int);
-  }
-  else{
+  }else if ((DBUS_TYPE_INT32 == dbus_message_iter_get_arg_type(&l_args))) {
+   /* get argument from the message (app pid)*/
+    dbus_message_iter_get_basic(&l_args, &l_param_int);
+   /* setup the arg type switch */
+     l_pid_switch = true;
+     log_message
+	("AL Daemon Reply to Method Call : Method called for %d\n",
+	 l_param_int);
+  }else{
      log_message
 	("AL Daemon Reply to Method Call : Argument is not string nor an int !%s",
 	 "\n");
@@ -1921,7 +2015,7 @@ void ReplyToIntrospect(DBusMessage *p_msg, DBusConnection *p_conn)
 void AlListenToMethodCall()
 {
   /* define message and reply */
-  DBusMessage *l_msg, *l_reply, *l_msg_notif, *l_reply_notif;
+  DBusMessage *l_msg, *l_reply, *l_msg_notif, *l_reply_notif, *l_msg_state, *l_reply_state, *l_sig_state_notif;
   /* define connection for default method calls and notification signals */
   DBusConnection *l_conn;
   /* error definition */
@@ -1951,7 +2045,15 @@ void AlListenToMethodCall()
   /* handlers for deferred execution unit and timing extraction */
   char *l_app_copy = malloc(DIM_MAX*sizeof(l_app_copy)); 
   char *l_app_deferred = malloc(DIM_MAX*sizeof(l_app_deferred));
- 
+  /* setup fg/bg application state */
+  bool l_fg_state;
+  /* application object path in state property setup */
+  const char *l_path;
+  /* iterator used for variant DBus type that stores the state property value */
+  DBusMessageIter l_iter, l_variant; 
+  /* string to save the ful unit name when fetching path for properties */
+  char *l_app_string = malloc(DIM_MAX*sizeof(l_app_string));
+
   log_message
       ("AL Daemon Method Call Listener : Listening for method calls!%s",
        "\n");
@@ -2007,7 +2109,7 @@ void AlListenToMethodCall()
   /* add matcher for method calls */
   dbus_bus_add_match(l_conn,
 		     "type='method_call',"
-		     "interface='org.GENIVI.AppL.method'", &l_err);
+		     "interface='org.GENIVI.AppL'", &l_err);
 
   if (dbus_error_is_set(&l_err)) {
     log_message
@@ -2073,6 +2175,7 @@ void AlListenToMethodCall()
       /* extract application name and arguments */
       dbus_message_get_args(l_msg, &l_err,
                             DBUS_TYPE_STRING, &l_app,
+			    DBUS_TYPE_BOOLEAN, &l_fg_state,
 			    DBUS_TYPE_INVALID);
       log_message
 	("AL Daemon Method Call Listener Run: Arguments were extracted for %s\n",
@@ -2157,8 +2260,9 @@ void AlListenToMethodCall()
 	  }
 	}
       }
+       // TODO setup foreground property in systemd and wait for reply 
       /* run the application */
-      Run(l_pid, true, 0, l_app);
+      Run(l_pid, l_fg_state, 0, l_app);
     }
 
     /* check if this is a method call for the right interface amd method */
@@ -2170,6 +2274,7 @@ void AlListenToMethodCall()
 			    DBUS_TYPE_STRING, &l_app,
  			    DBUS_TYPE_INT32, &l_uid_val,
  			    DBUS_TYPE_INT32, &l_gid_val,
+			    DBUS_TYPE_BOOLEAN, &l_fg_state,
 			    DBUS_TYPE_INVALID);
       /* test if deferred task */
       if ((strstr(l_app, "reboot") !=NULL) || (strstr(l_app, "poweroff") !=NULL)){
@@ -2232,8 +2337,10 @@ void AlListenToMethodCall()
 	  }
 	}
       }
+      // TODO setup foreground property in systemd and wait for reply 
+
       /* runas the application with euid and egid parameters */
-      RunAs(l_uid_val, l_gid_val, l_pid, true, 0, l_app);
+      RunAs(l_uid_val, l_gid_val, l_pid, l_fg_state, 0, l_app);
     }
 
     /* check if this is a method call for the right interface amd method */
@@ -2517,6 +2624,215 @@ void AlListenToMethodCall()
       } 
       Restart(l_app); 
     }
+    
+    if (dbus_message_is_method_call(l_msg, AL_METHOD_INTERFACE, "ChangeTaskState")) {
+      AlReplyToMethodCall(l_msg, l_conn);
+      /* extract application name and arguments */
+      dbus_message_get_args(l_msg, &l_err,
+                            DBUS_TYPE_INT32, &l_pid,
+			    DBUS_TYPE_BOOLEAN, &l_fg_state,
+			    DBUS_TYPE_INVALID);
+
+    /* test if the application is stopped */
+    if(!l_pid){
+	log_message("AL Daemon Method Call Listener : Cannot change state because application doesn't exist or is stopped !%s", "\n");
+	continue;
+    }
+    /* extract application name from pid */
+      l_r = (int) AppNameFromPid(l_pid, l_app);
+      if (l_r!=1) {
+	/* test for application service file existence */
+	if (!AppExistsInSystem(l_app)) {
+	  log_message
+	      ("AL Daemon Method Call Listener : Cannot change state for %s !\n Application %s is not found in the system !\n",
+	       l_app, l_app);
+	  continue;
+	}
+     }
+      
+      if(AppPidFromName(l_app)!=0){
+	log_message("AL Daemon Method Call Listener ChangeTaskState : Setting the state property for %s !\n ", l_app);
+      
+    /* get unit object path */ 
+  if (!(l_msg_state = dbus_message_new_method_call("org.freedesktop.systemd1",
+					     	   "/org/freedesktop/systemd1",
+					     	   "org.freedesktop.systemd1.Manager",
+					     	   "GetUnit"))) {
+    log_message
+	("AL Daemon ChangeTaskState  : Could not allocate message for %s\n",
+	 l_app);
+    if (l_msg_state)
+    	dbus_message_unref(l_msg_state);
+     /* free the error */
+    dbus_error_free(&l_err);
+   continue;
+  }
+  /* form the proper unit name to fetch object path */
+  strcat(l_app,".service");
+  strcpy(l_app_string, l_app);
+  /* append application name as argument to method call */
+  if (!dbus_message_append_args(l_msg_state,
+				DBUS_TYPE_STRING, &l_app_string,
+				DBUS_TYPE_INVALID)) {
+        log_message
+	("AL Daemon ChangeTaskState  : Could not append arguments to message for %s\n",
+	 l_app);
+    if (l_msg_state)
+    	dbus_message_unref(l_msg_state);
+     /* free the error */
+     dbus_error_free(&l_err);
+   continue;
+  }
+  log_message
+	("AL Daemon ChangeTaskState  : Appended message args to fetch object path for %s\n",
+	 l_app);
+  /* send the message on the bus and wait for a reply */
+  if (!(l_reply_state =
+	dbus_connection_send_with_reply_and_block(l_conn, l_msg_state, -1,
+						  &l_err))) {
+    log_message
+	("AL Daemon ChangeTaskState  : Unknown information for %s \n",
+	 l_app);
+    log_message
+	("AL Daemon ChangeTaskState  : Error [%s: %s]\n",
+	 l_err.name, l_err.message);
+    if (l_msg_state)
+    	dbus_message_unref(l_msg_state);
+    if (l_reply_state)
+    	dbus_message_unref(l_reply_state);
+    /* free the error */
+    dbus_error_free(&l_err);
+   continue;
+  }
+  log_message
+	("AL Daemon ChangeTaskState  : Object path fetch message sent and block for reply for %s\n",
+	 l_app);
+
+  /* extract arguments from the reply; the object path is useful for property fetch */
+  if (!dbus_message_get_args(l_reply_state, &l_err,
+			     DBUS_TYPE_OBJECT_PATH, &l_path,
+			     DBUS_TYPE_INVALID)) {
+    log_message
+	("AL Daemon ChangeTaskState  : Failed to parse reply for %s\n",
+	 l_app);
+    if (l_msg_state)
+    	dbus_message_unref(l_msg_state);
+    if (l_reply_state)
+    	dbus_message_unref(l_reply_state);
+     /* free the error */
+     dbus_error_free(&l_err);
+   continue;
+  }
+  log_message
+	("AL Daemon ChangeTaskState  : Extracted object path for %s\n",
+	 l_app);
+  /* unreference the message */
+  dbus_message_unref(l_msg_state);
+  
+  /* send state (fg/bg) property setup method call to systemd */
+  if (!(l_msg_state =
+       dbus_message_new_method_call("org.freedesktop.systemd1",  
+				    l_path, 
+				    "org.freedesktop.DBus.Properties", 
+				    "Set"))) { 
+
+    log_message
+	("AL Daemon Method Call Listener : Could not allocate message when setting state property to systemd! \n %s \n",
+	 l_err.message);
+    if (l_msg_state)
+      dbus_message_unref(l_msg_state);
+    if (l_reply_state)
+      dbus_message_unref(l_reply_state);
+    dbus_error_free(&l_err);
+    continue;
+  }
+  log_message
+	("AL Daemon ChangeTaskState  : Called property set method call for %s\n",
+	 l_app);
+   /* initialize the iterator for arguments append */
+   dbus_message_iter_init_append(l_msg, &l_iter);
+  log_message
+	("AL Daemon ChangeTaskState  : Initialized iterator for property value setup method call for %s\n", l_app);
+   /* append interface for property setting */
+   if(!dbus_message_iter_append_basic(&l_iter, 
+				      DBUS_TYPE_STRING, 
+				      "org.freedesktop.systemd1.Service")){
+	log_message
+	("AL Daemon ChangeTaskState : Could not append interface to message for %s \n",
+	 l_app);
+	continue;
+   }
+   log_message
+	("AL Daemon ChangeTaskState  : Appended interface name for property set for %s\n",
+	 l_app);
+   /* append property name */
+   if(!dbus_message_iter_append_basic(&l_iter, 
+				      DBUS_TYPE_STRING, 
+				      "Foreground")){ 
+	log_message
+	("AL Daemon ChangeTaskState : Could not append property to message for %s \n",
+	 l_app);
+	continue;
+   }
+   log_message
+	("AL Daemon ChangeTaskState  : Appended property name to setup for %s\n",
+	 l_app);
+   /* append the variant that stores the value for the foreground state property */
+    if(!dbus_message_iter_open_container(&l_iter, 
+				     DBUS_TYPE_VARIANT, 
+				     DBUS_TYPE_BOOLEAN_AS_STRING,
+				     &l_variant)){
+	log_message("AL Daemon ChangeTaskState : Not enough memory to open container %s" ,"\n");
+	continue;
+    }
+    log_message
+	("AL Daemon ChangeTaskState  : Opened container for property value setup for %s\n",
+	 l_app);
+    dbus_bool_t l_state = (dbus_bool_t)l_fg_state;
+    if(!dbus_message_iter_append_basic (&l_variant, 
+				        DBUS_TYPE_BOOLEAN,  
+                                        &l_state)){
+    	log_message
+	("AL Daemon ChangeTaskState : Could not append property value to message for %s \n",
+	 l_app);
+     	continue;
+    }
+    log_message
+	("AL Daemon ChangeTaskState  : Set the state (fg/bg) value in variant for %s\n",
+	 l_app);
+    if(!dbus_message_iter_close_container (&l_iter, 
+					   &l_variant)){
+	log_message("AL Daemon ChangeTaskState : Not enough memory to close container %s" ,"\n");
+	continue;
+    }
+    log_message
+	("AL Daemon ChangeTaskState  : Closed container for property value setup for %s\n",
+	 l_app);     
+   /* wait for the reply from systemd after setting the state (fg/bg) property */
+   if (!(l_reply_state =
+       dbus_connection_send_with_reply_and_block(l_conn, l_msg_state,
+						 -1, &l_err))) {
+    	log_message
+	("AL Daemon Method Call Listener : Didn't received a reply for state property method call: %s \n",l_err.message);
+    if (l_msg_state)
+      dbus_message_unref(l_msg_state);
+    if (l_reply_state)
+      dbus_message_unref(l_reply_state);
+    dbus_error_free(&l_err);
+    continue;
+   }
+   
+   log_message("AL Daemon Method Call Listener ChangeTaskState : Reply after setting state for %s was received!\n ", l_app);
+	
+   log_message("AL Daemon Method Call Listener ChangeTaskState : Broadcast state change notification for %s !\n ", l_app);
+     
+     /* send notification anouncing that an application changed state (fg/bg) */	
+     AlChangeTaskStateNotifier(l_conn, l_app, (l_fg_state==true)?"true":"false");
+
+   log_message("AL Daemon Method Call Listener ChangeTaskState : State change notification was sent for %s !\n ", l_app);			
+    ChangeTaskState(l_pid, l_fg_state);       
+    }
+ }
 
     /* consider only property change notification signals */
     if (dbus_message_is_signal
@@ -2642,6 +2958,7 @@ void AlListenToMethodCall()
   /* free the messages */
   dbus_message_unref(l_msg);
   dbus_message_unref(l_msg_notif);
+  dbus_message_unref(l_msg_state);
 }
 
 /* Signal handler for the daemon */
