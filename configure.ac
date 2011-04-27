@@ -8,7 +8,7 @@ AC_CONFIG_SRCDIR([src/al-daemon.h])
 AC_CONFIG_HEADERS([config.h])
 
 #AM inclusions
-AM_INIT_AUTOMAKE([foreign 1.0 -Wall silent-rules tar-pax dist-bzip2])
+AM_INIT_AUTOMAKE([foreign 1.0 -Wall tar-pax dist-bzip2])
 AM_MAINTAINER_MODE
 #AM_PROG_LIBTOOL
 
