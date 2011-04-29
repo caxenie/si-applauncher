@@ -385,7 +385,9 @@ GKeyFile *ParseUnitFile(char *p_file)
 void SetupUnitFileKey(char *p_file, char *p_key, char *p_val, char *p_unit)
 {
   /* key file handler */
-  int l_fd;
+  int l_fd; 
+  /* variable to store stat info */
+  struct stat l_buf;
   if(strstr(p_file,".timer")==NULL){
   log_message
       ("AL Daemon Service Unit Setup : Entered the Setup service unit sequence for %s \n",
@@ -398,21 +400,25 @@ void SetupUnitFileKey(char *p_file, char *p_key, char *p_val, char *p_unit)
 
   /* test application service file existence and exit with error if it doesn't exist */
   if(strstr(p_file,".timer")==NULL){
-    	if (!g_file_test(p_file, G_FILE_TEST_EXISTS)) {
-		log_message("AL Daemon Service Unit Setup : Service file %s doesn't exist !\n",
+	log_message("AL Daemon Service Unit Setup : Test service file existence for %s\n", p_unit);
+	if(!g_stat(p_file,&l_buf)){
+		log_message("AL Daemon Service Unit Setup : Service file %s stat !\n",
 		p_file);
-	return;
+		return;
 	}
 	/* open the corresponding key file for the service to write */
-        if (!g_fopen(p_file, "rw")) {
+	log_message("AL Daemon Service Unit Setup : Test service file open for %s\n", p_unit);
+        if (!(l_fd = g_fopen(p_file, "r+"))) {
       	  log_message
 	    ("AL Daemon Service Unit Setup : Cannot open service unit file %s for adding data !\n",
 	     p_file);
+	  fclose(l_fd);
         return;
         }
   }else{
+  log_message("AL Daemon Service Unit Setup : Test timer file existence for %s\n", p_unit);
   /* test timer file existence and create if not exists */
-  if (!g_file_test(p_file, G_FILE_TEST_EXISTS)) {
+  if(!g_stat(p_file,&l_buf)){
     /* initialize the error */
     GError *l_error = NULL;
     /* entries for the special reboot and poweroff units */
@@ -421,13 +427,19 @@ void SetupUnitFileKey(char *p_file, char *p_key, char *p_val, char *p_unit)
     char *l_shutdown_entry =
 	"[Unit]\n Description=Timer for deferred shutdown\n [Timer]\n OnActiveSec=0s\n Unit=poweroff.service\n";
     /* create the key file with permissions */
-    l_fd = creat(p_file, 777);
-    log_message("AL Daemon : File %s created !\n", p_file);
+    log_message("AL Daemon Timer Unit Setup : Creating timer file for %s\n", p_unit);
+    l_fd = creat(p_file, O_RDWR | O_CREAT);
+    if(l_fd==-1){
+	log_message("AL Daemon Timer Unit Setup : Cannot create timer file for %s\n", p_unit);
+ 	return;
+    }
+    log_message("AL Daemon Timer Unit Setup : Timer file %s created !\n", p_file);
     /* open the key file for write */
-    if (!g_fopen(p_file, "rw")) {
+    if (!(l_fd = g_fopen(p_file, "r+"))) {
       log_message
 	  ("AL Daemon Timer Unit Setup : Cannot open timer unit file %s for adding data !\n",
 	   p_file);
+	fclose(l_fd);
       return;
     }
     /* the timer units are available only for reboot and shutdown */
@@ -447,6 +459,8 @@ void SetupUnitFileKey(char *p_file, char *p_key, char *p_val, char *p_unit)
   }
   /* parse the key value file */
   GKeyFile *l_key_file = ParseUnitFile(p_file);
+  log_message("AL Daemon Unit Setup : Key file %s was parsed !\n",
+		p_file);
   /* key file length */
   gsize l_file_length;
  
@@ -501,6 +515,7 @@ void SetupUnitFileKey(char *p_file, char *p_key, char *p_val, char *p_unit)
     return;
    }
   }
+  if(l_fd) fclose(l_fd);
 }
 
 /* Function responsible to parse the service unit and extract ownership info */
@@ -513,10 +528,17 @@ void ExtractOwnershipInfo(char *p_euid, char *p_egid, char *p_file)
   /* local store of egid and euid */
   char *l_gid = malloc(DIM_MAX*sizeof(l_gid));
   char *l_uid = malloc(DIM_MAX*sizeof(l_uid));
+  log_message("AL Daemon Unit File Parser : Creating new key file to support ownership info for %s \n", p_file);
   /* the created GKeyFile for the given file on disk */
   GKeyFile *l_out_new_key_file = g_key_file_new();
+  if(!l_out_new_key_file) {
+	log_message("AL Daemon Unit File Parser : The key file cannot be created for %s \n", p_file);
+	return;
+  }
+  log_message("AL Daemon Unit File Parser : Initialize the error for uid/gid extraction for %s \n", p_file);
   /* initialize the error */
   GError *l_err = NULL;
+  log_message("AL Daemon Unit File Parser : Load key file from disk for %s \n", p_file);
   /* load key file structure from file on disk */
   if (!g_key_file_load_from_file
       (l_out_new_key_file, p_file, G_KEY_FILE_NONE, &l_err)) {
@@ -524,8 +546,10 @@ void ExtractOwnershipInfo(char *p_euid, char *p_egid, char *p_file)
 	("AL Daemon Unit File Parser : Cannot load key structure from service unit key file! (%d: %s)\n",
 	 l_err->code, l_err->message);
     g_error_free(l_err);
+    g_key_file_free(l_out_new_key_file);
     return;
   }
+  log_message("AL Daemon Unit File Parser : Extracting groups from key file structure for %s \n", p_file);
   /* extract groups from key file structure */
   l_groups = g_key_file_get_groups(l_out_new_key_file, &l_groups_length);
   log_message
@@ -535,6 +559,7 @@ void ExtractOwnershipInfo(char *p_euid, char *p_egid, char *p_file)
     log_message
 	("AL Daemon Ownership Info Extractor : Could not retrieve groups from %s service unit file!\n",
 	 p_file);
+      g_key_file_free(l_out_new_key_file);
       return;
   }
   unsigned long l_i;
@@ -581,12 +606,19 @@ void ExtractOwnershipInfo(char *p_euid, char *p_egid, char *p_file)
     }
   }
   /* the extracted ownership values */
+  log_message("AL Daemon Ownership Info Extractor : Preparing keys to be returned for %s \n",
+	 p_file);
   strcpy(p_egid, l_gid);
+  log_message("AL Daemon Ownership Info Extractor : Extracted keys from key file for %s \n",
+	 p_file);
   strcpy(p_euid, l_uid);
+  log_message("AL Daemon Ownership Info Extractor : Extracted keys from key file for %s \n",
+	 p_file);
+  if(l_out_new_key_file) g_key_file_free(l_out_new_key_file);
 }
 
 /* Function responsible to extract the user name from the uid */
-void MapUidToUser(int p_uid, char *p_user){
+int MapUidToUser(int p_uid, char *p_user){
   /* handler for passwd */
   struct passwd *l_pwd;
   /* storage for uid */
@@ -594,15 +626,16 @@ void MapUidToUser(int p_uid, char *p_user){
   /* check id existence */
   if ((l_pwd = getpwuid(p_uid))==NULL){
          printf("AL Daemon UID to User Mapper : UID %d is not associated with any existing user !\n", p_uid);
-	 return;
+	 return -1;
 	 }
   /* extract the user from the structure */
   strcpy(p_user, l_pwd->pw_name);
   printf("AL Daemon UID to User Mapper : uid=%d(%s) \n", p_uid, p_user);
+  return 0;
 }
 
 /* Function responsible to extract the group name from the gid */
-void MapGidToGroup(int p_gid, char *p_group){
+int MapGidToGroup(int p_gid, char *p_group){
   /* handler for group info */
   struct group *l_gp;
   /* storage for gid */
@@ -610,11 +643,12 @@ void MapGidToGroup(int p_gid, char *p_group){
   /* check group */
   if ((l_gp = getgrgid(l_gid))==NULL){
 	printf("AL Daemon GID to User Mapper : GID %d is not associated with any existing group !\n", p_gid);
-	return;	
+	return -1;	
 	}
   /* extract guid information */
   strcpy(p_group, l_gp->gr_name);
   printf("AL Daemon GID to Group Mapper : gid=%d(%s) \n", p_gid, p_group);
+  return 0;
 }
 
 /* 
@@ -1304,8 +1338,14 @@ void RunAs(int p_egid, int p_euid, int p_newPID, bool p_isFg, int p_parentPID,
     sprintf(l_cmd, "systemctl start %s.timer", p_commandLine);
   }
   /* extract user name and group name from uid and gid */
-  MapUidToUser(p_euid, l_user);
-  MapGidToGroup(p_egid, l_group);
+  if(MapUidToUser(p_euid, l_user)!=0){
+	log_message("AL Daemon RunAs : Cannot map uid to user for %s\n", p_commandLine);
+	return;
+  }
+  if(MapGidToGroup(p_egid, l_group)!=0){
+	log_message("AL Daemon RunAs : Cannot map gid to user for %s\n", p_commandLine);
+	return;
+  }
   /* SetupUnitFileKey call to setup the key and corresponding values, if not existing will be created */
   /* the service file will be updated with proper Group and User information */
   SetupUnitFileKey(l_srv_path, "User", l_user, p_commandLine);
@@ -1323,7 +1363,7 @@ void RunAs(int p_egid, int p_euid, int p_newPID, bool p_isFg, int p_parentPID,
   if(p_isFg==true) strcpy(l_flag,"foreground");
   else strcpy(l_flag,"background");
   /* change the state of the application given by pid */
-  log_message("AL Daemon Run : Application with pid %d will runas %s in %s \n", l_user, (int)AppPidFromName(p_commandLine), l_flag);
+  log_message("AL Daemon RunAs : Application with pid %d will runas %s in %s \n", (int)AppPidFromName(p_commandLine), l_user, l_flag);
 
   /* systemd invocation */
   l_ret = system(l_cmd);
@@ -1394,7 +1434,7 @@ void StopAs(int p_pid, int p_euid, int p_egid){
   /* stores the application name */
   char l_app_name[DIM_MAX];
   /* command line for the application */
-  char *l_commandLine;
+  char *l_commandLine = malloc(DIM_MAX*sizeof(l_commandLine));
   /* extracted user and group values from service file */
   char *l_group = malloc(DIM_MAX*sizeof(l_group));
   char *l_user = malloc(DIM_MAX*sizeof(l_user));
@@ -1414,11 +1454,18 @@ void StopAs(int p_pid, int p_euid, int p_egid){
   /* form the systemd command line string */
   sprintf(l_cmd, "systemctl stop %s.service", l_commandLine);
   /* test ownership and rights before stopping application */
+  log_message("AL Daemon StopAs : Extracting ownership info for %s\n", l_commandLine);
   ExtractOwnershipInfo(l_user, l_group, l_srv_path);
   log_message("AL Daemon StopAs : The ownership information was extracted properly [ user : %s ] and [ group : %s ]\n", l_user, l_group);
   /* extract user name and group name from uid and gid */
-  MapUidToUser(p_euid, l_str_euid);
-  MapGidToGroup(p_egid, l_str_egid);
+  if(MapUidToUser(p_euid, l_str_euid)!=0){
+	log_message("AL Daemon RunAs : Cannot map uid to user for %s\n", l_commandLine);
+	return;
+  }
+  if(MapGidToGroup(p_egid, l_str_egid)!=0){
+	log_message("AL Daemon RunAs : Cannot map gid to user for %s\n", l_commandLine);
+	return;
+  }
   log_message("AL Daemon StopAs : The input ownership information [ user: %s ] and [ group : %s ]\n", l_str_euid, l_str_egid);
   if((strcmp(l_user, l_str_euid)!=0) && (strcmp(l_group, l_str_egid)!=0)){
 	log_message("AL Daemon StopAs : The current user doesn't have permissions to stopas %s!\n", l_commandLine); 
@@ -1873,7 +1920,7 @@ void AlReplyToMethodCall(DBusMessage * p_msg, DBusConnection * p_conn)
   DBusMessage *l_reply;
   /* reply arguments */
   DBusMessageIter l_args;
-  bool l_stat = true;
+  dbus_bool_t l_stat = true;
   /* reply status */
   dbus_uint32_t l_level = 21614;
   dbus_uint32_t l_serial = 0;
@@ -2750,13 +2797,14 @@ void AlListenToMethodCall()
 	("AL Daemon ChangeTaskState  : Called property set method call for %s\n",
 	 l_app);
    /* initialize the iterator for arguments append */
-   dbus_message_iter_init_append(l_msg, &l_iter);
+   dbus_message_iter_init_append(l_msg_state, &l_iter);
   log_message
 	("AL Daemon ChangeTaskState  : Initialized iterator for property value setup method call for %s\n", l_app);
    /* append interface for property setting */
+   char *l_iface = "org.freedesktop.systemd1.Service";
    if(!dbus_message_iter_append_basic(&l_iter, 
 				      DBUS_TYPE_STRING, 
-				      "org.freedesktop.systemd1.Service")){
+				      &l_iface)){
 	log_message
 	("AL Daemon ChangeTaskState : Could not append interface to message for %s \n",
 	 l_app);
@@ -2766,9 +2814,10 @@ void AlListenToMethodCall()
 	("AL Daemon ChangeTaskState  : Appended interface name for property set for %s\n",
 	 l_app);
    /* append property name */
+   char *l_prop = "Foreground";
    if(!dbus_message_iter_append_basic(&l_iter, 
 				      DBUS_TYPE_STRING, 
-				      "Foreground")){ 
+				      &l_prop)){ 
 	log_message
 	("AL Daemon ChangeTaskState : Could not append property to message for %s \n",
 	 l_app);
@@ -2862,8 +2911,7 @@ void AlListenToMethodCall()
       }
       /* filter only the unit and service specific interfaces */
       if ((strcmp(l_interface, "org.freedesktop.systemd1.Unit") != 0)
-	  && (strcmp(l_interface, "org.freedesktop.systemd1.Service") !=
-	      0)) {
+	  && (strcmp(l_interface, "org.freedesktop.systemd1.Job") != 0)) { // previously org.freedesktop.systemd1.Service
 	if (l_msg)
 	  /* free the message */
 	  dbus_message_unref(l_msg);

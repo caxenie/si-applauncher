@@ -156,9 +156,9 @@ extern int AppExistsInSystem(char *app_name);
 /* Function responsible with restarting an application when SHM detects an abnormal operation of the application */
 extern void Restart(char *app_name);
 /* Function responsible to extract the user name from the uid */
-extern void MapUidToUser(int uid, char *user);
+extern int MapUidToUser(int uid, char *user);
 /* Function responsible to extract the group name from the gid */
-extern void MapGidToGroup(int gid, char *group);
+extern int MapGidToGroup(int gid, char *group);
 /* Function responsible to get the current user as specified in the current_user GConf key and start the last user mode apps */
 extern int GetCurrentUser(GConfClient* client, GConfEntry* key, char *user);
 /* Function responsible to start the specific applications for the current user mode */
