@@ -1282,7 +1282,7 @@ void Run(int p_newPID, bool p_isFg, int p_parentPID, char *p_commandLine)
   if(p_isFg==true) strcpy(l_flag,"foreground");
   else strcpy(l_flag,"background");
   /* change the state of the application given by pid */
-  log_message("AL Daemon Run : Application with pid %d will run in %s \n", (int)AppPidFromName(p_commandLine), l_flag);
+  log_message("AL Daemon Run : Application %s will run in %s \n", p_commandLine, l_flag);
 
   /* systemd invocation */
   l_ret = system(l_cmd);
@@ -1351,19 +1351,20 @@ void RunAs(int p_egid, int p_euid, int p_newPID, bool p_isFg, int p_parentPID,
   SetupUnitFileKey(l_srv_path, "User", l_user, p_commandLine);
   SetupUnitFileKey(l_srv_path, "Group", l_group, p_commandLine); 
   log_message("AL Daemon RunAs : Service file was updated with User=%s and Group=%s information !\n", l_user, l_group);
+  /* test application state */
+  if(p_isFg==true) strcpy(l_flag,"foreground");
+  else strcpy(l_flag,"background");
+
   /* issue daemon reload to apply and acknowledge modifications to the service file on the disk */
-  l_ret = system("systemctl daemon-reload --system");
+  l_ret = system("systemctl daemon-reload --system"); 
   if (l_ret == -1) {
     log_message
 	("AL Daemon RunAs : After setting the service file reload systemd manager configuration failed ! Err: %s\n",
 	 strerror(errno));
      return;
   }
-  /* test application state */
-  if(p_isFg==true) strcpy(l_flag,"foreground");
-  else strcpy(l_flag,"background");
   /* change the state of the application given by pid */
-  log_message("AL Daemon RunAs : Application with pid %d will runas %s in %s \n", (int)AppPidFromName(p_commandLine), l_user, l_flag);
+  log_message("AL Daemon RunAs : Application %s will runas %s in %s \n", p_commandLine, l_user, l_flag);
 
   /* systemd invocation */
   l_ret = system(l_cmd);
@@ -1503,6 +1504,196 @@ void ChangeTaskState(int p_pid, bool p_isFg)
   else strcpy(l_flag,"background");
   /* change the state of the application given by pid */
  log_message("AL Daemon ChangeTaskState : Application with pid %d changed state to %s \n", p_pid, l_flag);
+}
+
+/* 
+ * Function responsible to setup the (fg/bg) state when starting the application
+ * for the first time using Run or RunAs */
+int SetupApplicationStartupState(DBusConnection *p_conn, char *p_app, bool l_fg_state)
+{
+  /* DBus message and reply for task change state */
+  DBusMessage *l_msg_state, *l_reply_state;
+  /* error */
+  DBusError l_err;
+  /* object path for the application */
+  char *l_path;
+  /* iterators for variant type embedding for state info */
+  DBusMessageIter l_iter, l_variant;
+  /* full unit name */
+  char *l_unit = malloc(DIM_MAX*sizeof(l_unit));
+  strcpy(l_unit, p_app);
+  strcat(l_unit, ".service");
+  /* error initialization */
+  dbus_error_init(&l_err);
+  /* get unit object path */ 
+  if (!(l_msg_state = dbus_message_new_method_call("org.freedesktop.systemd1",
+					     	   "/org/freedesktop/systemd1",
+					     	   "org.freedesktop.systemd1.Manager",
+					     	   "GetUnit"))) {
+    log_message
+	("AL Daemon Setup Application Startup State  : Could not allocate message for %s\n",
+	 p_app);
+    if (l_msg_state)
+    	dbus_message_unref(l_msg_state);
+     /* free the error */
+    dbus_error_free(&l_err);
+   return -1;
+  }
+  /* append application name as argument to method call */
+  if (!dbus_message_append_args(l_msg_state,
+				DBUS_TYPE_STRING, &l_unit,
+				DBUS_TYPE_INVALID)) {
+        log_message
+	("AL Daemon Setup Application Startup State  : Could not append arguments to message for %s\n",
+	 l_unit);
+    if (l_msg_state)
+    	dbus_message_unref(l_msg_state);
+     /* free the error */
+     dbus_error_free(&l_err);
+   return -1;
+  }
+  log_message
+	("AL Daemon Setup Application Startup State  : Appended message args to fetch object path for %s\n",
+	 p_app);
+  /* send the message on the bus and wait for a reply */
+  if (!(l_reply_state =
+	dbus_connection_send_with_reply_and_block(p_conn, l_msg_state, -1,
+						  &l_err))) {
+    log_message
+	("AL Daemon Setup Application Startup State  : Unknown information for %s \n",
+	 l_unit);
+    log_message
+	("AL Daemon Setup Application Startup State  : Error [%s : %s]\n",
+	 l_err.name, l_err.message);
+    if (l_msg_state)
+    	dbus_message_unref(l_msg_state);
+    if (l_reply_state)
+    	dbus_message_unref(l_reply_state);
+    /* free the error */
+    dbus_error_free(&l_err);
+   return -1;
+  }
+  log_message
+	("AL Daemon Setup Application Startup State  : Object path fetch message sent and block for reply for %s\n",
+	 l_unit);
+
+  /* extract arguments from the reply; the object path is useful for property fetch */
+  if (!dbus_message_get_args(l_reply_state, &l_err,
+			     DBUS_TYPE_OBJECT_PATH, &l_path,
+			     DBUS_TYPE_INVALID)) {
+    log_message
+	("AL Daemon Setup Application Startup State  : Failed to parse reply for %s\n",
+	 l_unit);
+    if (l_msg_state)
+    	dbus_message_unref(l_msg_state);
+    if (l_reply_state)
+    	dbus_message_unref(l_reply_state);
+     /* free the error */
+     dbus_error_free(&l_err);
+   return -1;
+  }
+  log_message
+	("AL Daemon Setup Application Startup State  : Extracted object path for %s\n",
+	 l_unit);
+  /* unreference the message */
+  dbus_message_unref(l_msg_state);
+  
+  /* send state (fg/bg) property setup method call to systemd */
+  if (!(l_msg_state =
+       dbus_message_new_method_call("org.freedesktop.systemd1",  
+				    l_path, 
+				    "org.freedesktop.DBus.Properties", 
+				    "Set"))) { 
+
+    log_message
+	("AL Daemon Method Call Listener : Could not allocate message when setting state property to systemd! \n %s \n",
+	 l_err.message);
+    if (l_msg_state)
+      dbus_message_unref(l_msg_state);
+    if (l_reply_state)
+      dbus_message_unref(l_reply_state);
+    dbus_error_free(&l_err);
+    return -1;
+  }
+  log_message
+	("AL Daemon Setup Application Startup State  : Called property set method call for %s\n",
+	 p_app);
+   /* initialize the iterator for arguments append */
+   dbus_message_iter_init_append(l_msg_state, &l_iter);
+  log_message
+	("AL Daemon Setup Application Startup State  : Initialized iterator for property value setup method call for %s\n", l_unit);
+   /* append interface for property setting */
+   char *l_iface = "org.freedesktop.systemd1.Service";
+   if(!dbus_message_iter_append_basic(&l_iter, 
+				      DBUS_TYPE_STRING, 
+				      &l_iface)){
+	log_message
+	("AL Daemon Setup Application Startup State : Could not append interface to message for %s \n",
+	 p_app);
+	return -1;
+   }
+   log_message
+	("AL Daemon Setup Application Startup State  : Appended interface name for property set for %s\n",
+	 l_unit);
+   /* append property name */
+   char *l_prop = "Foreground";
+   if(!dbus_message_iter_append_basic(&l_iter, 
+				      DBUS_TYPE_STRING, 
+				      &l_prop)){ 
+	log_message
+	("AL Daemon Setup Application Startup State : Could not append property to message for %s \n",
+	 l_unit);
+	return -1;
+   }
+   log_message
+	("AL Daemon Setup Application Startup State  : Appended property name to setup for %s\n",
+	 l_unit);
+   /* append the variant that stores the value for the foreground state property */
+    if(!dbus_message_iter_open_container(&l_iter, 
+				     DBUS_TYPE_VARIANT, 
+				     DBUS_TYPE_BOOLEAN_AS_STRING,
+				     &l_variant)){
+	log_message("AL Daemon Setup Application Startup State : Not enough memory to open container %s" ,"\n");
+	return -1;
+    }
+    log_message
+	("AL Daemon Setup Application Startup State  : Opened container for property value setup for %s\n",
+	 l_unit);
+    dbus_bool_t l_state = (dbus_bool_t)l_fg_state;
+    if(!dbus_message_iter_append_basic (&l_variant, 
+				        DBUS_TYPE_BOOLEAN,  
+                                        &l_state)){
+    	log_message
+	("AL Daemon Setup Application Startup State : Could not append property value to message for %s \n",
+	 l_unit);
+     	return -1;
+    }
+    log_message
+	("AL Daemon Setup Application Startup State  : Set the state (fg/bg) value in variant for %s\n",
+	 l_unit);
+    if(!dbus_message_iter_close_container (&l_iter, 
+					   &l_variant)){
+	log_message("AL Daemon Setup Application Startup State : Not enough memory to close container %s" ,"\n");
+	return -1;
+    }
+    log_message
+	("AL Daemon Setup Application Startup State  : Closed container for property value setup for %s\n",
+	 l_unit);     
+   /* wait for the reply from systemd after setting the state (fg/bg) property */
+   if (!(l_reply_state =
+       dbus_connection_send_with_reply_and_block(p_conn, l_msg_state,
+						 -1, &l_err))) {
+    	log_message
+	("AL Daemon Method Call Listener : Didn't received a reply for state property method call: %s \n",l_err.message);
+    if (l_msg_state)
+      dbus_message_unref(l_msg_state);
+    if (l_reply_state)
+      dbus_message_unref(l_reply_state);
+    dbus_error_free(&l_err);
+    return -1;
+   }
+   log_message("AL Daemon Method Call Listener Setup Application Startup State : Reply after setting state for %s was received!\n ", l_unit);
+  return 0;
 }
 
 /* 
@@ -2238,7 +2429,6 @@ void AlListenToMethodCall()
               strcpy(l_app, l_app_copy);
 	      printf("Application name for method call %s\n", l_app);
       }
-      
       log_message("AL Daemon Method Call Listener : Run app: %s\n", l_app);
       /* if reboot / shutdown unit add deferred functionality in timer file */
       if (strstr(l_app, "reboot") != NULL) {
@@ -2307,7 +2497,11 @@ void AlListenToMethodCall()
 	  }
 	}
       }
-       // TODO setup foreground property in systemd and wait for reply 
+      /* setup foreground property in systemd and wait for reply */
+      if(SetupApplicationStartupState(l_conn, l_app , l_fg_state)!=0){
+		log_message("AL Daemon Method Call Listener : Cannot setup fg/bg state for %s , application will run in former state or default state \n" ,l_app);
+		continue;
+      }
       /* run the application */
       Run(l_pid, l_fg_state, 0, l_app);
     }
@@ -2330,8 +2524,6 @@ void AlListenToMethodCall()
 	      l_time = strtok(NULL, " ");
               strcpy(l_app, l_app_copy);
       }
-
-   
       /* if reboot / shutdown unit add deferred functionality in timer file */
       log_message("AL Daemon Method Call Listener : RunAs app: %s\n",
 		  l_app);
@@ -2384,10 +2576,17 @@ void AlListenToMethodCall()
 	  }
 	}
       }
-      // TODO setup foreground property in systemd and wait for reply 
-
       /* runas the application with euid and egid parameters */
       RunAs(l_uid_val, l_gid_val, l_pid, l_fg_state, 0, l_app);
+      /* setup foreground property in systemd and wait for reply 
+       * the setup is done after starting the application due to 
+       * the fact that RunAs issues a daemon-reload that would overwrite
+       * the state setup. the time penalty is minimal 
+       */
+      if(SetupApplicationStartupState(l_conn, l_app, l_fg_state)!=0){
+		log_message("AL Daemon Method Call Listener : Cannot setup fg/bg state for %s , application will runas %d in former state or default state \n" ,l_app, l_uid_val);
+		continue;
+      }
     }
 
     /* check if this is a method call for the right interface amd method */
@@ -2875,8 +3074,12 @@ void AlListenToMethodCall()
 	
    log_message("AL Daemon Method Call Listener ChangeTaskState : Broadcast state change notification for %s !\n ", l_app);
      
-     /* send notification anouncing that an application changed state (fg/bg) */	
+     /* send notification anouncing that an application changed state (fg/bg) 
+      * used if needed  
+      */	
+#if 0     
      AlChangeTaskStateNotifier(l_conn, l_app, (l_fg_state==true)?"true":"false");
+#endif
 
    log_message("AL Daemon Method Call Listener ChangeTaskState : State change notification was sent for %s !\n ", l_app);			
     ChangeTaskState(l_pid, l_fg_state);       
