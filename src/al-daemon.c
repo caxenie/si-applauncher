@@ -732,7 +732,7 @@ int StartUserModeApps(GConfClient *p_client, char *p_user)
 	 /* get app name */
 	 l_app = (char*)g_slist_nth_data(l_app_list, l_idx);
          /* run application */
- 	 Run(l_app_pid, true, 0, l_app);
+ 	 Run(l_app_pid, TRUE, 0, l_app);
 	 log_message("AL Daemon Start User Mode Apps : Started %s for user %s !\n", l_app, p_user);
   }
   log_message("AL Daemon Start User Mode Apps : Last user mode applications for user %s was setup!\n", p_user);
@@ -1279,7 +1279,7 @@ void Run(int p_newPID, bool p_isFg, int p_parentPID, char *p_commandLine)
   }
   
   /* test application state */
-  if(p_isFg==true) strcpy(l_flag,"foreground");
+  if(p_isFg==TRUE) strcpy(l_flag,"foreground");
   else strcpy(l_flag,"background");
   /* change the state of the application given by pid */
   log_message("AL Daemon Run : Application %s will run in %s \n", p_commandLine, l_flag);
@@ -1352,7 +1352,7 @@ void RunAs(int p_egid, int p_euid, int p_newPID, bool p_isFg, int p_parentPID,
   SetupUnitFileKey(l_srv_path, "Group", l_group, p_commandLine); 
   log_message("AL Daemon RunAs : Service file was updated with User=%s and Group=%s information !\n", l_user, l_group);
   /* test application state */
-  if(p_isFg==true) strcpy(l_flag,"foreground");
+  if(p_isFg==TRUE) strcpy(l_flag,"foreground");
   else strcpy(l_flag,"background");
 
   /* issue daemon reload to apply and acknowledge modifications to the service file on the disk */
@@ -1500,7 +1500,7 @@ void TaskStopped(char *p_imagePath, int p_pid)
 void ChangeTaskState(int p_pid, bool p_isFg)
 {
   char *l_flag = malloc(DIM_MAX*sizeof(l_flag));
-  if(p_isFg==true) strcpy(l_flag,"foreground");
+  if(p_isFg==TRUE) strcpy(l_flag,"foreground");
   else strcpy(l_flag,"background");
   /* change the state of the application given by pid */
  log_message("AL Daemon ChangeTaskState : Application with pid %d changed state to %s \n", p_pid, l_flag);
@@ -2111,7 +2111,7 @@ void AlReplyToMethodCall(DBusMessage * p_msg, DBusConnection * p_conn)
   DBusMessage *l_reply;
   /* reply arguments */
   DBusMessageIter l_args;
-  dbus_bool_t l_stat = true;
+  dbus_bool_t l_stat = TRUE;
   /* reply status */
   dbus_uint32_t l_level = 21614;
   dbus_uint32_t l_serial = 0;
@@ -2119,7 +2119,7 @@ void AlReplyToMethodCall(DBusMessage * p_msg, DBusConnection * p_conn)
   char *l_param = "";
   int l_param_int = 0;
   /* arg type switch according to api call parameters */
-  bool l_name_switch = false, l_pid_switch = false;
+  bool l_name_switch = FALSE, l_pid_switch = FALSE;
   /* read the arguments */
   if (!dbus_message_iter_init(p_msg, &l_args)) {
     log_message
@@ -2131,7 +2131,7 @@ void AlReplyToMethodCall(DBusMessage * p_msg, DBusConnection * p_conn)
      /* get argument from the message (app name)*/
      dbus_message_iter_get_basic(&l_args, &l_param);
      /* setup the arg type switch */
-     l_name_switch = true;
+     l_name_switch = TRUE;
      log_message
 	("AL Daemon Reply to Method Call : Method called for %s\n",
 	 l_param);
@@ -2139,7 +2139,7 @@ void AlReplyToMethodCall(DBusMessage * p_msg, DBusConnection * p_conn)
    /* get argument from the message (app pid)*/
     dbus_message_iter_get_basic(&l_args, &l_param_int);
    /* setup the arg type switch */
-     l_pid_switch = true;
+     l_pid_switch = TRUE;
      log_message
 	("AL Daemon Reply to Method Call : Method called for %d\n",
 	 l_param_int);
@@ -2147,7 +2147,7 @@ void AlReplyToMethodCall(DBusMessage * p_msg, DBusConnection * p_conn)
    /* get argument from the message (app pid)*/
     dbus_message_iter_get_basic(&l_args, &l_param_int);
    /* setup the arg type switch */
-     l_pid_switch = true;
+     l_pid_switch = TRUE;
      log_message
 	("AL Daemon Reply to Method Call : Method called for %d\n",
 	 l_param_int);
@@ -2390,7 +2390,7 @@ void AlListenToMethodCall()
   }
 
   /* loop, testing for new messages */
-  while (true) {
+  while (TRUE) {
     /* non blocking read of the next available message */
     dbus_connection_read_write(l_conn, 0);
     l_msg = dbus_connection_pop_message(l_conn);
@@ -3078,7 +3078,7 @@ void AlListenToMethodCall()
       * used if needed  
       */	
 #if 0     
-     AlChangeTaskStateNotifier(l_conn, l_app, (l_fg_state==true)?"true":"false");
+     AlChangeTaskStateNotifier(l_conn, l_app, (l_fg_state==TRUE)?"TRUE":"FALSE");
 #endif
 
    log_message("AL Daemon Method Call Listener ChangeTaskState : State change notification was sent for %s !\n ", l_app);			
