@@ -3155,7 +3155,7 @@ void AlListenToMethodCall()
 	   dbus_connection_send_with_reply_and_block(l_conn,
 						     l_msg, -1, &l_err))) {
 	log_message
-	    ("AL Daemon Signal Listener : Failed to issue method call: %s",
+	    ("AL Daemon Signal Listener : No reply received. Unable to issue method call: %s",
 	     l_err.message);
 	if (l_msg)
 	  dbus_message_unref(l_msg);
