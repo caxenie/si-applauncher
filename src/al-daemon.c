@@ -430,7 +430,6 @@ void SetupUnitFileKey(char *p_file, char *p_key, char *p_val, char *p_unit)
       log_message
 	  ("AL Daemon Timer Unit Setup : Cannot open timer unit file %s for adding data !\n",
 	   p_file);
-	fclose(l_fd);
       return;
     }
     /* the timer units are available only for reboot and shutdown */
@@ -479,8 +478,6 @@ void SetupUnitFileKey(char *p_file, char *p_key, char *p_val, char *p_unit)
   /* write new data to file */
   gchar *l_new_file_data =
       g_key_file_to_data(l_key_file, &l_file_length, &l_err);
-  /* free the file  */
-  g_key_file_free(l_key_file);
   /* test if file is accessible */
   if (l_new_file_data == NULL) {
    /* if the key file is for a service file */
@@ -515,7 +512,6 @@ void SetupUnitFileKey(char *p_file, char *p_key, char *p_val, char *p_unit)
     return;
    }
   }
-  if(l_fd) fclose(l_fd);
 }
 
 /* Function responsible to parse the service unit and extract ownership info */
