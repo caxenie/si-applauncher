@@ -299,7 +299,7 @@ GKeyFile *ParseUnitFile(char *p_file)
   GError *l_err = NULL;
   /* load key file structure from file on disk */
   if (!g_key_file_load_from_file
-      (l_out_new_key_file, p_file, G_KEY_FILE_NONE, &l_err)) {
+      (l_out_new_key_file, p_file, G_KEY_FILE_KEEP_COMMENTS | G_KEY_FILE_KEEP_TRANSLATIONS, &l_err)) {
    /* test if unit is a timer or a normal service */
    if(strstr(p_file, ".timer")==NULL){
     log_message
@@ -310,7 +310,8 @@ GKeyFile *ParseUnitFile(char *p_file)
 	("AL Daemon Unit File Parser : Cannot load key structure from timer unit key file! (%d: %s)\n",
 	 l_err->code, l_err->message);
     }
-    g_error_free(l_err);
+    g_error_free(l_err); 
+    g_key_file_free(l_out_new_key_file);
     return NULL;
   }
   /* extract groups from key file structure */
@@ -384,41 +385,31 @@ GKeyFile *ParseUnitFile(char *p_file)
 
 void SetupUnitFileKey(char *p_file, char *p_key, char *p_val, char *p_unit)
 {
-  /* key file handler */
-  int l_fd; 
+  /* key file handlers */
+  FILE *l_fd_open; 
+  int l_fd_create;
   /* variable to store stat info */
   struct stat l_buf;
-  if(strstr(p_file,".timer")==NULL){
-  log_message
-      ("AL Daemon Service Unit Setup : Entered the Setup service unit sequence for %s \n",
-       p_unit);
-  }else{
-  log_message
-      ("AL Daemon Timer Unit Setup : Entered the Setup timer unit sequence for %s \n",
-       p_unit);
-  }
-
   /* test application service file existence and exit with error if it doesn't exist */
   if(strstr(p_file,".timer")==NULL){
 	log_message("AL Daemon Service Unit Setup : Test service file existence for %s\n", p_unit);
-	if(!g_stat(p_file,&l_buf)){
+	if(g_stat(p_file,&l_buf)!=0){
 		log_message("AL Daemon Service Unit Setup : Service file %s stat !\n",
 		p_file);
 		return;
 	}
 	/* open the corresponding key file for the service to write */
 	log_message("AL Daemon Service Unit Setup : Test service file open for %s\n", p_unit);
-        if (!(l_fd = g_fopen(p_file, "r+"))) {
+        if ((l_fd_open = g_fopen(p_file, "r+"))==NULL) {
       	  log_message
 	    ("AL Daemon Service Unit Setup : Cannot open service unit file %s for adding data !\n",
 	     p_file);
-	  fclose(l_fd);
-        return;
+          return;
         }
   }else{
   log_message("AL Daemon Service Unit Setup : Test timer file existence for %s\n", p_unit);
   /* test timer file existence and create if not exists */
-  if(!g_stat(p_file,&l_buf)){
+  if(g_stat(p_file,&l_buf)!=0){
     /* initialize the error */
     GError *l_error = NULL;
     /* entries for the special reboot and poweroff units */
@@ -428,14 +419,14 @@ void SetupUnitFileKey(char *p_file, char *p_key, char *p_val, char *p_unit)
 	"[Unit]\n Description=Timer for deferred shutdown\n [Timer]\n OnActiveSec=0s\n Unit=poweroff.service\n";
     /* create the key file with permissions */
     log_message("AL Daemon Timer Unit Setup : Creating timer file for %s\n", p_unit);
-    l_fd = creat(p_file, O_RDWR | O_CREAT);
-    if(l_fd==-1){
+    l_fd_create = g_creat(p_file, O_RDWR | O_CREAT);
+    if(l_fd_create==-1){
 	log_message("AL Daemon Timer Unit Setup : Cannot create timer file for %s\n", p_unit);
  	return;
     }
     log_message("AL Daemon Timer Unit Setup : Timer file %s created !\n", p_file);
     /* open the key file for write */
-    if (!(l_fd = g_fopen(p_file, "r+"))) {
+    if ((l_fd_open = g_fopen(p_file, "r+"))==NULL) {
       log_message
 	  ("AL Daemon Timer Unit Setup : Cannot open timer unit file %s for adding data !\n",
 	   p_file);
@@ -463,7 +454,16 @@ void SetupUnitFileKey(char *p_file, char *p_key, char *p_val, char *p_unit)
 		p_file);
   /* key file length */
   gsize l_file_length;
- 
+  log_message("AL Daemon Unit Setup : Key file %s is checked !\n",
+		p_file);
+  /* test key file validity */
+  if(!l_key_file){
+	log_message("AL Daemon Unit Setup : Key file %s could not be parsed !\n",
+		p_file);
+	return;
+  }
+  log_message("AL Daemon Unit Setup : Setup entry for unit type (timer/service) for %s!\n",
+		p_file);
   /* modify the entries according input params  */
   if(strstr(p_file,".timer")==NULL){
   	/* if the unit file is an application service file */
