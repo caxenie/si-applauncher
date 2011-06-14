@@ -1279,7 +1279,6 @@ void Run(int p_newPID, bool p_isFg, int p_parentPID, char *p_commandLine)
   else strcpy(l_flag,"background");
   /* change the state of the application given by pid */
   log_message("AL Daemon Run : Application %s will run in %s \n", p_commandLine, l_flag);
-
   /* systemd invocation */
   l_ret = system(l_cmd);
   if (l_ret == -1) {
@@ -1350,7 +1349,6 @@ void RunAs(int p_egid, int p_euid, int p_newPID, bool p_isFg, int p_parentPID,
   /* test application state */
   if(p_isFg==TRUE) strcpy(l_flag,"foreground");
   else strcpy(l_flag,"background");
-
   /* issue daemon reload to apply and acknowledge modifications to the service file on the disk */
   l_ret = system("systemctl daemon-reload --system"); 
   if (l_ret == -1) {
@@ -2287,7 +2285,8 @@ void AlListenToMethodCall()
   DBusMessageIter l_iter, l_variant; 
   /* string to save the ful unit name when fetching path for properties */
   char *l_app_string = malloc(DIM_MAX*sizeof(l_app_string));
-
+  /* load unit message for systemd */
+  DBusMessage *l_load_msg, *l_load_reply;
   log_message
       ("AL Daemon Method Call Listener : Listening for method calls!%s",
        "\n");
@@ -2493,10 +2492,57 @@ void AlListenToMethodCall()
 	  }
 	}
       }
+      /* ensure proper load state for the unit before starting it */
+      if (!(l_load_msg =
+       dbus_message_new_method_call("org.freedesktop.systemd1",
+				    "/org/freedesktop/systemd1",
+				    "org.freedesktop.systemd1.Manager",
+				    "LoadUnit"))) {
+	    log_message
+		("AL Daemon Method Call Listener : Could not allocate message when loading unit for Run ! \n %s \n",
+		 l_err.message);
+	    if (l_load_msg)
+	      dbus_message_unref(l_load_msg);
+	    if (l_load_reply)
+	      dbus_message_unref(l_load_reply);
+	    dbus_error_free(&l_err);
+	    continue;
+	  }
+   /* temp to store full service name */
+   char *l_full_srv = malloc(DIM_MAX*sizeof(l_full_srv));;
+   strcpy(l_full_srv, l_app);
+   strcat(l_full_srv, ".service");
+   /* append the name of the application to load */
+    if (!dbus_message_append_args(l_load_msg,
+				 DBUS_TYPE_STRING, &l_full_srv,
+                                 DBUS_TYPE_INVALID)) {
+                    log_message
+			("AL Daemon Method Call Listener : Failed to append app name for Run when loading : %s \n",
+			 l_err.message);
+		    if (l_load_msg)
+		      dbus_message_unref(l_load_msg);
+		    if (l_load_reply)
+		      dbus_message_unref(l_load_reply);
+		    dbus_error_free(&l_err);
+		    continue;
+                }
+  
+    if (!(l_load_reply =
+       dbus_connection_send_with_reply_and_block(l_conn, l_load_msg,
+						 -1, &l_err))) {
+	    log_message
+		("AL Daemon Method Call Listener : Failed to issue LoadUnit method call for Run: %s \n",
+		 l_err.message);
+	    if (l_load_msg)
+	      dbus_message_unref(l_load_msg);
+	    if (l_load_reply)
+	      dbus_message_unref(l_load_reply);
+	    dbus_error_free(&l_err);
+	    continue;
+	    }
       /* setup foreground property in systemd and wait for reply */
       if(SetupApplicationStartupState(l_conn, l_app , l_fg_state)!=0){
 		log_message("AL Daemon Method Call Listener : Cannot setup fg/bg state for %s , application will run in former state or default state \n" ,l_app);
-		continue;
       }
       /* run the application */
       Run(l_pid, l_fg_state, 0, l_app);
@@ -2572,6 +2618,55 @@ void AlListenToMethodCall()
 	  }
 	}
       }
+      /* ensure proper load state for the unit before starting it */
+    if (!(l_load_msg =
+       dbus_message_new_method_call("org.freedesktop.systemd1",
+				    "/org/freedesktop/systemd1",
+				    "org.freedesktop.systemd1.Manager",
+				    "LoadUnit"))) {
+	    log_message
+		("AL Daemon Method Call Listener : Could not allocate message when loading unit for RunAs ! \n %s \n",
+		 l_err.message);
+	    if (l_load_msg)
+	      dbus_message_unref(l_load_msg);
+	    if (l_load_reply)
+	      dbus_message_unref(l_load_reply);
+	    dbus_error_free(&l_err);
+	    continue;
+    }
+    /* temp to store full service name */
+    char *l_full_srv = malloc(DIM_MAX*sizeof(l_full_srv));;
+    strcpy(l_full_srv, l_app);
+    strcat(l_full_srv, ".service");
+    /* append the name of the application to load */
+    if (!dbus_message_append_args(l_load_msg,
+				 DBUS_TYPE_STRING, &l_full_srv,
+                                 DBUS_TYPE_INVALID)) {
+                    log_message
+			("AL Daemon Method Call Listener : Failed to append app name for RunAs when loading : %s \n",
+			 l_err.message);
+		    if (l_load_msg)
+		      dbus_message_unref(l_load_msg);
+		    if (l_load_reply)
+		      dbus_message_unref(l_load_reply);
+		    dbus_error_free(&l_err);
+		    continue;
+     }
+  
+    if (!(l_load_reply =
+       dbus_connection_send_with_reply_and_block(l_conn, l_load_msg,
+						 -1, &l_err))) {
+	    log_message
+		("AL Daemon Method Call Listener : Failed to issue LoadUnit method call for RunAs: %s \n",
+		 l_err.message);
+	    if (l_load_msg)
+	      dbus_message_unref(l_load_msg);
+	    if (l_load_reply)
+	      dbus_message_unref(l_load_reply);
+	    dbus_error_free(&l_err);
+	    continue;
+      }
+
       /* runas the application with euid and egid parameters */
       RunAs(l_uid_val, l_gid_val, l_pid, l_fg_state, 0, l_app);
       /* setup foreground property in systemd and wait for reply 
