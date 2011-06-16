@@ -1,5 +1,5 @@
 /* 
-* al-daemon.h, contains the declarations of the message handler functions for the org.GENIVI.AppL.method DBus interface 
+* al-daemon.h, contains the main declarations of the main application launcher loop
 * 
 * Copyright (c) 2010 Wind River Systems, Inc. 
 * 
@@ -34,7 +34,7 @@
 #define AL_SIGNAME_TASK_STOPPED "TaskStopped"
 #define AL_SIGNAME_NOTIFICATION "GlobalStateNotification"
 #define DIM_MAX 200
-#define AL_VERSION "1.4"
+#define AL_VERSION "1.5"
 #define AL_GCONF_CURRENT_USER_KEY "/current_user"
 #define AL_GCONF_LAST_USER_MODE_KEY "/last_mode"
 #define AL_PID_FILE "/var/run/al-daemon.pid"
@@ -107,10 +107,8 @@
         "</node>\n"
 
 /* Tracing support */
-unsigned char g_verbose = 0;
-/* CLI commands */
-unsigned char g_stop = 0;
-unsigned char g_start = 0;
+extern unsigned char g_verbose;
+
 /* macro for logging */
 #define log_message(format,args...) \
 			do{ \
@@ -118,55 +116,13 @@ unsigned char g_start = 0;
 				    fprintf(stdout,format,args); \
 			  } while(0);
 
-/* Function to extract PID value using the name of an application */
-extern pid_t AppPidFromName(char *app_name);
-/* Find application name from PID */
-extern int AppNameFromPid(int pid, char *app_name);
-/* High level interface for the AL Daemon */
-extern void Run(int newPID, bool isFg, int parentPID, char *commandLine);
-extern void RunAs(int euid, int egid, int newPID, bool isFg, int parentPID,
-		  char *commandLine);
-extern void Suspend(int pid);
-extern void Resume(int pid);
-extern void Stop(int pid);
-extern void StopAs(int pid, int euid, int egid);
-extern void ChangeTaskState(int pid, bool isFg);
-/* Send start/stop signals over the bus to the clients */
-extern void TaskStarted(char *imagePath, int pid);
-extern void TaskStopped(char *imagePath, int pid);
-/* Connect to the DBUS bus and send a broadcast signal regarding application state */
-extern void AlSendAppSignal(DBusConnection * bus, char *name);
-/* Receive the method calls and reply */
-extern void AlReplyToMethodCall(DBusMessage * msg, DBusConnection * conn);
-/* Server that exposes a method call and waits for it to be called */
+/* Function responsible with the command line interface output */
+extern void AlPrintCLI();
+/* Function responsible with command line options parsing */
+extern void AlParseCLIOptions(int argc, char *const *argv);
+/* Server that exposes methods and waits for it to be called */
 extern void AlListenToMethodCall();
-/* Function responsible to parse the .timer unit and extract the triggering key */
-extern GKeyFile *ParseUnitFile(char *file);
-/* Function responsible to parse the service unit and extract ownership info */
-extern void ExtractOwnershipInfo(char *euid, char *egid, char *file);
-/* Function responsible to parse the .timer unit and setup the triggering key value */
-extern void SetupUnitFileKey(char *file, char *key, char *val, char *unit);
-/* Function to extract the status of an application after starting it or that is already running in the system */
-extern int AlGetAppState(DBusConnection * bus, char *app_name,
-			 char *state_info);
-/* Function responsible to broadcast the state of an application that started execution or an application already running in the system  */
-extern void AlAppStateNotifier(DBusConnection * bus, char *app_name);
-/* Function responsible to test if a given application exists in the system. */
-extern int AppExistsInSystem(char *app_name);
-/* Function responsible with restarting an application when SHM detects an abnormal operation of the application */
-extern void Restart(char *app_name);
-/* Function responsible to extract the user name from the uid */
-extern int MapUidToUser(int uid, char *user);
-/* Function responsible to extract the group name from the gid */
-extern int MapGidToGroup(int gid, char *group);
-/* Function responsible to get the current user as specified in the current_user GConf key and start the last user mode apps */
-extern int GetCurrentUser(GConfClient* client, GConfEntry* key, char *user);
-/* Function responsible to start the specific applications for the current user mode */
-extern int StartUserModeApps(GConfClient *client, char *user);
-/* Function responsible to initialize the last user mode at daemon startup */
-extern int InitializeLastUserMode();
 /* Signal handler for the daemon */
 extern void AlSignalHandler(int sig);
-/* Function responsible with the daemonization procedure */
-extern void AlDaemonize();
+
 #endif

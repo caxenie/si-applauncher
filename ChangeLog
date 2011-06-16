@@ -1,7 +1,22 @@
-2010-12-23  Adrian Spinu  <adrian.spinu@windriver.com>
+2011-06-16  Cristian Axenie  <cristian.axenie@windriver.com>
+* Released new source file structure for application launcher
+2011-04-27  Cristian Axenie  <cristian.axenie@windriver.com>
+* Release 1.5 of the application launcher
 
-<------>* Add autotools files
+2011-04-27  Cristian Axenie  <cristian.axenie@windriver.com>
+* Release 1.4 of the application launcher
+
+2011-03-28  Cristian Axenie  <cristian.axenie@windriver.com>
+* Release 1.3 of the application launcher
+
+2011-02-28  Cristian Axenie  <cristian.axenie@windriver.com>
+* Release 1.2 of the application launcher
+
+2010-12-28  Cristian Axenie  <cristian.axenie@windriver.com>
+* Release 1.1 of the application launcher
+
+2010-12-23  Adrian Spinu  <adrian.spinu@windriver.com>
+* Add autotools files
 
 2010-11-29  Cristian Axenie  <cristian.axenie@windriver.com>
-
-<------>* Release 1.0 of the application launcher
+* Release 1.0 of the application launcher
