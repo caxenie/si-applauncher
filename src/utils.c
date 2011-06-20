@@ -268,8 +268,10 @@ int AppExistsInSystem(char *p_app_name)
   /* full name string */
   char full_name_srv[DIM_MAX];
   char full_name_trg[DIM_MAX];
+  /* check if template */
+  char *l_temp = ExtractUnitNameTemplate(p_app_name);
   /* get the full path name */
-  sprintf(full_name_srv, "/lib/systemd/system/%s.service", p_app_name);
+  sprintf(full_name_srv, "/lib/systemd/system/%s.service", l_temp);
   sprintf(full_name_trg, "/lib/systemd/system/%s.target", p_app_name);
   /* contains stat info for service / target */
   struct stat file_stat;
@@ -708,5 +710,27 @@ int SetupApplicationStartupState(DBusConnection *p_conn, char *p_app, bool l_fg_
    }
    log_message("AL Daemon Method Call Listener Setup Application Startup State : Reply after setting state for %s was received!\n ", l_unit);
   return 0;
+}
+
+/* 
+ * Function responsible to extract template name from service file name 
+ * when running application with variable command line parameters.
+ */
+char *ExtractUnitNameTemplate(char *unit_name) {
+        const char *l_p;
+        char *l_res;
+        size_t l_dim;
+	/* test if template */
+        if (!(l_p = strchr(unit_name, '@')))
+                return strdup(unit_name);
+        l_dim = l_p - unit_name + 1;
+	/* init the result */
+        if (!(l_res = (char *) malloc(sizeof(char)*(l_dim + 1)))){
+		log_message("AL Daemon Template Name Extractor : Cannot allocate template handler for %s !\n", unit_name);
+                return NULL;
+	}
+	/* extract the template name */
+        strcpy(mempcpy(l_res, unit_name, l_dim),"");
+        return l_res;
 }
 

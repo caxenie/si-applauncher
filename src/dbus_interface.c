@@ -62,7 +62,7 @@ void Run(int p_newPID, bool p_isFg, int p_parentPID, char *p_commandLine)
   /* the command line for the application */
   char l_cmd[DIM_MAX];
   /* form the call string for systemd */
-  /* check if single service will be started with run */
+  /* check if template / simple service will be started with run */
   if((AppExistsInSystem(p_commandLine))==1){
   	sprintf(l_cmd, "systemctl start %s.service", p_commandLine);
   }
@@ -126,9 +126,15 @@ void RunAs(int p_egid, int p_euid, int p_newPID, bool p_isFg, int p_parentPID,
   char l_srv_path[DIM_MAX];
   /* string that will store the state */
   char *l_flag = malloc(DIM_MAX*sizeof(l_flag));
-  sprintf(l_srv_path, "/lib/systemd/system/%s.service", p_commandLine);
+  /* check if template */
+  char *l_temp = ExtractUnitNameTemplate(p_commandLine);
+  if(l_temp==NULL){
+	log_message("AL Daemon RunAs : Cannot allocate template handler for %s !\n", p_commandLine);
+	return;
+  }
+  sprintf(l_srv_path, "/lib/systemd/system/%s.service", l_temp);
   /* form the call string for systemd */
-  sprintf(l_cmd, "systemctl start %s.service", p_commandLine);
+    sprintf(l_cmd, "systemctl start %s.service", l_temp);
   /* check if the unit has an associated timer and adjust the call string */
   if (strcmp(p_commandLine, "reboot") == 0) {
     sprintf(l_cmd, "systemctl start %s.timer", p_commandLine);

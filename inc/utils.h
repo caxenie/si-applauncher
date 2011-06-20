@@ -35,4 +35,7 @@ extern void SetupUnitFileKey(char *file, char *key, char *val, char *unit);
 /* Function responsible to setup the (fg/bg) state when starting the application
  * for the first time using Run or RunAs */
 extern int SetupApplicationStartupState(DBusConnection *p_conn, char *p_app, bool l_fg_state);
-
+/* Function responsible to extract template name from service file name 
+ * when running application with variable command line parameters.
+ */
+extern char *ExtractUnitNameTemplate(char *unit_name);
