@@ -81,7 +81,7 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
 					     "/org/freedesktop/systemd1",
 					     "org.freedesktop.systemd1.Manager",
 					     "GetUnit"))) {
-    log_message
+    log_error_message
 	("AL Daemon State Extractor : Could not allocate message for %s\n",
 	 p_app_name);
     l_ret = -ENOMEM;
@@ -91,7 +91,7 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
   if (!dbus_message_append_args(l_msg,
 				DBUS_TYPE_STRING, &p_app_name,
 				DBUS_TYPE_INVALID)) {
-    log_message
+    log_error_message
 	("AL Daemon State Extractor : Could not append arguments to message for %s\n",
 	 p_app_name);
     l_ret = -ENOMEM;
@@ -101,10 +101,10 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
   if (!(l_reply =
 	dbus_connection_send_with_reply_and_block(p_bus, l_msg, -1,
 						  &l_error))) {
-    log_message
+    log_error_message
 	("AL Daemon Active State Extractor : Unknown information for %s \n",
 	 p_app_name);
-    log_message("AL Daemon Active State Extractor : Error [%s: %s]\n",
+    log_error_message("AL Daemon Active State Extractor : Error [%s: %s]\n",
 		l_error.name, l_error.message);
     goto free_res;
   }
@@ -112,7 +112,7 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
   if (!dbus_message_get_args(l_reply, &l_error,
 			     DBUS_TYPE_OBJECT_PATH, &l_path,
 			     DBUS_TYPE_INVALID)) {
-    log_message
+    log_error_message
 	("AL Daemon State Extractor : Failed to parse reply for %s\n",
 	 p_app_name);
     l_ret = -EIO;
@@ -125,7 +125,7 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
 					     l_path,
 					     "org.freedesktop.DBus.Properties",
 					     "Get"))) {
-    log_message
+    log_error_message
 	("AL Daemon Active State Extractor : Could not allocate message for %s \n",
 	 p_app_name);
     l_ret = -ENOMEM;
@@ -136,7 +136,7 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
 				DBUS_TYPE_STRING, &interface,
 				DBUS_TYPE_STRING, &l_as_property,
 				DBUS_TYPE_INVALID)) {
-    log_message
+    log_error_message
 	("AL Daemon Active State Extractor : Could not append arguments to message for %s \n",
 	 p_app_name);
     l_ret = -ENOMEM;
@@ -148,7 +148,7 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
   if (!(l_reply =
 	dbus_connection_send_with_reply_and_block(p_bus, l_msg, -1,
 						  &l_error))) {
-    log_message
+    log_error_message
 	("AL Daemon Active State Extractor : Failed to issue method call for %s\n",
 	 p_app_name);
     l_ret = -EIO;
@@ -157,7 +157,7 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
   /* parse reply and extract arguments */
   if (!dbus_message_iter_init(l_reply, &l_iter) ||
       dbus_message_iter_get_arg_type(&l_iter) != DBUS_TYPE_VARIANT) {
-    log_message
+    log_error_message
 	("AL Daemon Active State Extractor : Failed to parse reply for %s\n",
 	 p_app_name);
     l_ret = -EIO;
@@ -167,7 +167,7 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
   dbus_message_iter_recurse(&l_iter, &l_sub_iter);
   /* argument type check */
   if (dbus_message_iter_get_arg_type(&l_sub_iter) != DBUS_TYPE_STRING) {
-    log_message
+    log_error_message
 	("AL Daemon Active State Extractor : Failed to get arg type for %s when fetching active state\n",
 	 p_app_name);
     l_ret = -EIO;
@@ -182,7 +182,7 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
 					     "/org/freedesktop/systemd1",
 					     "org.freedesktop.systemd1.Manager",
 					     "GetUnit"))) {
-    log_message
+    log_error_message
 	("AL Daemon Load State Extractor : Could not allocate message for %s\n",
 	 p_app_name);
     l_ret = -ENOMEM;
@@ -192,7 +192,7 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
   if (!dbus_message_append_args(l_msg,
 				DBUS_TYPE_STRING, &p_app_name,
 				DBUS_TYPE_INVALID)) {
-    log_message
+    log_error_message
 	("AL Daemon Load State Extractor : Could not append arguments to message for %s\n",
 	 p_app_name);
     l_ret = -ENOMEM;
@@ -202,10 +202,10 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
   if (!(l_reply =
 	dbus_connection_send_with_reply_and_block(p_bus, l_msg, -1,
 						  &l_error))) {
-    log_message
+    log_error_message
 	("AL Daemon Load State Extractor : Unknown information for %s \n",
 	 p_app_name);
-    log_message("AL Daemon Load State Extractor : Error [%s: %s]\n",
+    log_error_message("AL Daemon Load State Extractor : Error [%s: %s]\n",
 		l_error.name, l_error.message);
     goto free_res;
   }
@@ -213,7 +213,7 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
   if (!dbus_message_get_args(l_reply, &l_error,
 			     DBUS_TYPE_OBJECT_PATH, &l_path,
 			     DBUS_TYPE_INVALID)) {
-    log_message
+    log_error_message
 	("AL Daemon Load State Extractor : Failed to parse reply for %s\n",
 	 p_app_name);
     l_ret = -EIO;
@@ -224,7 +224,7 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
 					     l_path,
 					     "org.freedesktop.DBus.Properties",
 					     "Get"))) {
-    log_message
+    log_error_message
 	("AL Daemon Load State Extractor : Could not allocate message for %s \n",
 	 p_app_name);
     l_ret = -ENOMEM;
@@ -235,7 +235,7 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
 				DBUS_TYPE_STRING, &interface,
 				DBUS_TYPE_STRING, &l_ls_property,
 				DBUS_TYPE_INVALID)) {
-    log_message
+    log_error_message
 	("AL Daemon Load State Extractor : Could not append arguments to message for %s \n",
 	 p_app_name);
     l_ret = -ENOMEM;
@@ -247,7 +247,7 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
   if (!(l_reply =
 	dbus_connection_send_with_reply_and_block(p_bus, l_msg, -1,
 						  &l_error))) {
-    log_message
+    log_error_message
 	("AL Daemon Load State Extractor : Failed to issue method call for %s\n",
 	 p_app_name);
     l_ret = -EIO;
@@ -256,7 +256,7 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
   /* initialize iterator and verify argument type */
   if (!dbus_message_iter_init(l_reply, &l_iter) ||
       dbus_message_iter_get_arg_type(&l_iter) != DBUS_TYPE_VARIANT) {
-    log_message
+    log_error_message
 	("AL Daemon Load State Extractor : Failed to parse reply for %s\n",
 	 p_app_name);
     l_ret = -EIO;
@@ -266,7 +266,7 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
   dbus_message_iter_recurse(&l_iter, &l_sub_iter);
   /* extracted argument type verification */
   if (dbus_message_iter_get_arg_type(&l_sub_iter) != DBUS_TYPE_STRING) {
-    log_message
+    log_error_message
 	("AL Daemon Load State Extractor : Failed to get arg type for %s when fetching load state\n",
 	 p_app_name);
     l_ret = -EIO;
@@ -281,7 +281,7 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
 					     "/org/freedesktop/systemd1",
 					     "org.freedesktop.systemd1.Manager",
 					     "GetUnit"))) {
-    log_message
+    log_error_message
 	("AL Daemon Sub State Extractor : Could not allocate message for %s\n",
 	 p_app_name);
     l_ret = -ENOMEM;
@@ -291,7 +291,7 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
   if (!dbus_message_append_args(l_msg,
 				DBUS_TYPE_STRING, &p_app_name,
 				DBUS_TYPE_INVALID)) {
-    log_message
+    log_error_message
 	("AL Daemon Sub State Extractor : Could not append arguments to message for %s\n",
 	 p_app_name);
     l_ret = -ENOMEM;
@@ -301,10 +301,10 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
   if (!(l_reply =
 	dbus_connection_send_with_reply_and_block(p_bus, l_msg, -1,
 						  &l_error))) {
-    log_message
+    log_error_message
 	("AL Daemon Sub State Extractor : Unknown information for %s \n",
 	 p_app_name);
-    log_message("AL Daemon Sub State Extractor : Error [%s: %s]\n",
+    log_error_message("AL Daemon Sub State Extractor : Error [%s: %s]\n",
 		l_error.name, l_error.message);
     goto free_res;
   }
@@ -312,7 +312,7 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
   if (!dbus_message_get_args(l_reply, &l_error,
 			     DBUS_TYPE_OBJECT_PATH, &l_path,
 			     DBUS_TYPE_INVALID)) {
-    log_message
+   log_error_message
 	("AL Daemon Sub State Extractor : Failed to parse reply for %s\n",
 	 p_app_name);
     l_ret = -EIO;
@@ -323,7 +323,7 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
 					     l_path,
 					     "org.freedesktop.DBus.Properties",
 					     "Get"))) {
-    log_message
+    log_error_message
 	("AL Daemon Sub State Extractor : Could not allocate message for %s \n",
 	 p_app_name);
     l_ret = -ENOMEM;
@@ -334,7 +334,7 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
 				DBUS_TYPE_STRING, &interface,
 				DBUS_TYPE_STRING, &l_ss_property,
 				DBUS_TYPE_INVALID)) {
-    log_message
+    log_error_message
 	("AL Daemon Sub State Extractor : Could not append arguments to message for %s \n",
 	 p_app_name);
     l_ret = -ENOMEM;
@@ -346,7 +346,7 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
   if (!(l_reply =
 	dbus_connection_send_with_reply_and_block(p_bus, l_msg, -1,
 						  &l_error))) {
-    log_message
+    log_error_message
 	("AL Daemon Sub State Extractor : Failed to issue method call for %s\n",
 	 p_app_name);
     l_ret = -EIO;
@@ -355,7 +355,7 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
   /* create iterator for reply parsing and verify argument type */
   if (!dbus_message_iter_init(l_reply, &l_iter) ||
       dbus_message_iter_get_arg_type(&l_iter) != DBUS_TYPE_VARIANT) {
-    log_message
+    log_error_message
 	("AL Daemon Sub State Extractor : Failed to parse reply for %s\n",
 	 p_app_name);
     l_ret = -EIO;
@@ -365,7 +365,7 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
   dbus_message_iter_recurse(&l_iter, &l_sub_iter);
   /* check extracted argument type validity */
   if (dbus_message_iter_get_arg_type(&l_sub_iter) != DBUS_TYPE_STRING) {
-    log_message
+    log_error_message
 	("AL Daemon Sub State Extractor : Failed to get arg type for %s when fetching sub state\n",
 	 p_app_name);
     l_ret = -EIO;
@@ -384,13 +384,13 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
   strcat(l_state, " ");
   strcat(l_state, l_ss_state);
 
-  log_message
+  log_debug_message
       ("AL Daemon State Extractor : State information for %s is given by next string [ %s ] \n",
        p_app_name, l_state);
   /* copy into return variable */
   strcpy(p_state_info, l_state);
 
-  log_message
+  log_debug_message
       ("AL Daemon State Extractor : State information for %s was extracted ! Returning to notifier function !\n",
        p_app_name);
   l_ret = 0;
@@ -432,12 +432,12 @@ void AlAppStateNotifier(DBusConnection *p_conn, char *p_app_name)
   char l_state_info[DIM_MAX];
   char *l_app_status;
 
-  log_message
+  log_debug_message
       ("AL Daemon Send Notification : Sending signal with value %s\n",
        p_app_name);
 
   /* extract the information to broadcast */
-  log_message
+  log_debug_message
       ("AL Daemon Send Notification : Getting application state for %s \n",
        p_app_name);
 
@@ -445,14 +445,13 @@ void AlAppStateNotifier(DBusConnection *p_conn, char *p_app_name)
   /* extract the application state  */
   if (AlGetAppState(p_conn, p_app_name, l_state_info) == 0) {
 
-    log_message
+    log_debug_message
 	("AL Daemon Send Notification : Received application state for %s \n",
 	 p_app_name);
 
     /* copy the state */
     l_app_status = strdup(l_state_info);
-
-    log_message
+    log_debug_message
 	(" AL Daemon Send Notification : Global State information for %s -> [ %s ] \n",
 	 p_app_name, l_app_status);
 
@@ -463,39 +462,39 @@ void AlAppStateNotifier(DBusConnection *p_conn, char *p_app_name)
 
     /* check for message state */
     if (NULL == l_msg) {
-      log_message("AL Daemon Send Notification for %s : Message Null\n",
+      log_error_message("AL Daemon Send Notification for %s : Message Null\n",
 		  p_app_name);
       return;
     }
-    log_message
+    log_debug_message
 	("AL Daemon Send Notification : Appending state arguments for %s\n",
 	 p_app_name);
 
     /* append arguments onto the end of message (signal) */
     dbus_message_iter_init_append(l_msg, &l_args);
-    log_message
+    log_debug_message
 	("AL Daemon Send Notification : Initialized iterator for appending message arguments at end for %s\n",
 	 p_app_name);
     /* append status information encoded in a string */
     if (!dbus_message_iter_append_basic
 	(&l_args, DBUS_TYPE_STRING, &l_app_status)) {
 
-      log_message
+      log_error_message
 	  ("AL Daemon Method Caller : Could not append args for status extraction message for %s!\n",
 	   p_app_name);
     }
-    log_message
+    log_debug_message
 	("AL Daemon Send Notification : Sending the state message for %s\n",
 	 p_app_name);
 
     /* send the message and flush the connection */
     if (!dbus_connection_send(p_conn, l_msg, &l_serial)) {
-      log_message
+      log_error_message
 	  ("AL Daemon Send Notification for %s: Connection Out Of Memory!\n",
 	   p_app_name);
     }
 
-    log_message("AL Daemon Send Notification for %s: Signal Sent\n",
+    log_debug_message("AL Daemon Send Notification for %s: Signal Sent\n",
 		p_app_name);
   }
   /* free the message */
@@ -517,7 +516,7 @@ void AlChangeTaskStateNotifier(DBusConnection *p_conn, char *p_app_name, char *p
   /* reply information */
   dbus_uint32_t l_serial = 0;
 
-  log_message
+  log_debug_message
       ("AL Daemon Send ChangeTaskStateComplete Notification : Sending signal for application %s with state %s \n", p_app_name, p_app_state);
 
     /* create a signal for fg/bg state notification & check for errors */
@@ -527,43 +526,43 @@ void AlChangeTaskStateNotifier(DBusConnection *p_conn, char *p_app_name, char *p
 
     /* check errors on message to be sent */
     if (NULL == l_msg) {
-      log_message("AL Daemon Send ChangeTaskStateComplete Notification for %s : Message Null\n",
+      log_error_message("AL Daemon Send ChangeTaskStateComplete Notification for %s : Message Null\n",
 		  p_app_name);
       return;
     }
-    log_message
+    log_debug_message
 	("AL Daemon Send ChangeTaskStateComplete Notification : Appending state arguments for %s\n",
 	 p_app_name);
 
     /* append arguments to the message (signal) */
     dbus_message_iter_init_append(l_msg, &l_args);
-    log_message
+    log_debug_message
 	("AL Daemon Send ChangeTaskStateComplete Notification : Initialized iterator for appending message arguments at end for %s\n",
 	 p_app_name);
     /* append status (fg/bg) information encoded in a string */
     if (!dbus_message_iter_append_basic
 	(&l_args, DBUS_TYPE_STRING, &p_app_name)) {
-      log_message
+      log_error_message
 	  ("AL Daemon Send ChangeTaskStateComplete Notification : Could not append app name for %s!\n", p_app_name);
     }
     if (!dbus_message_iter_append_basic
 	(&l_args, DBUS_TYPE_STRING, &p_app_state)) {
 
-      log_message
+      log_error_message
 	  ("AL Daemon Send ChangeTaskStateComplete Notification : Could not append app state for %s!\n", p_app_name);
     }
-    log_message
+    log_debug_message
 	("AL Daemon Send ChangeTaskStateComplete Notification : Sending the state message for %s\n",
 	 p_app_name);
 
     /* send the message and flush the connection */
     if (!dbus_connection_send(p_conn, l_msg, &l_serial)) {
-      log_message
+      log_error_message
 	  ("AL Daemon Send ChangeTaskStateComplete Notification for %s: Connection Out Of Memory!\n",
 	   p_app_name);
     }
 
-    log_message("AL Daemon Send ChangeTaskStateComplete Notification for %s: Signal Sent\n",
+    log_debug_message("AL Daemon Send ChangeTaskStateComplete Notification for %s: Signal Sent\n",
 		p_app_name);
 
   /* free the message */
@@ -608,7 +607,7 @@ void AlSendAppSignal(DBusConnection * p_conn, char *p_app_name)
   const char *l_interface =
       "org.freedesktop.systemd1.Service", *l_pid_property = "ExecMainPID";
 
-  log_message
+  log_debug_message
       ("AL Daemon Send Active State Notification : Sending signal for  %s\n",
        p_app_name);
 
@@ -616,7 +615,7 @@ void AlSendAppSignal(DBusConnection * p_conn, char *p_app_name)
   dbus_error_init(&l_err);
 
   /* extract the information to broadcast */
-  log_message
+  log_debug_message
       ("AL Daemon Send Active State Notification : Getting application state for %s \n",
        p_app_name);
 
@@ -626,7 +625,7 @@ void AlSendAppSignal(DBusConnection * p_conn, char *p_app_name)
 					     "/org/freedesktop/systemd1",
 					     "org.freedesktop.systemd1.Manager",
 					     "GetUnit"))) {
-    log_message
+    log_error_message
 	("AL Daemon Send Active State Notification : Could not allocate message for %s\n",
 	 p_app_name);
     l_ret = -ENOMEM;
@@ -636,7 +635,7 @@ void AlSendAppSignal(DBusConnection * p_conn, char *p_app_name)
   if (!dbus_message_append_args(l_msg,
 				DBUS_TYPE_STRING, &p_app_name,
 				DBUS_TYPE_INVALID)) {
-    log_message
+    log_error_message
 	("AL Daemon Send Active State Notification : Could not append arguments to message for %s\n",
 	 p_app_name);
     l_ret = -ENOMEM;
@@ -646,10 +645,10 @@ void AlSendAppSignal(DBusConnection * p_conn, char *p_app_name)
   if (!(l_reply =
 	dbus_connection_send_with_reply_and_block(p_conn, l_msg, -1,
 						  &l_err))) {
-    log_message
+    log_error_message
 	("AL Daemon Send Active State Notification : Unknown information for %s \n",
 	 p_app_name);
-    log_message
+    log_error_message
 	("AL Daemon Send Active State Notification : Error [%s: %s]\n",
 	 l_err.name, l_err.message);
     goto free_res;
@@ -658,7 +657,7 @@ void AlSendAppSignal(DBusConnection * p_conn, char *p_app_name)
   if (!dbus_message_get_args(l_reply, &l_err,
 			     DBUS_TYPE_OBJECT_PATH, &l_path,
 			     DBUS_TYPE_INVALID)) {
-    log_message
+    log_error_message
 	("AL Daemon Send Active State Notification : Failed to parse reply for %s\n",
 	 p_app_name);
     l_ret = -EIO;
@@ -671,7 +670,7 @@ void AlSendAppSignal(DBusConnection * p_conn, char *p_app_name)
 					     l_path,
 					     "org.freedesktop.DBus.Properties",
 					     "Get"))) {
-    log_message
+    log_error_message
 	("AL Daemon Send Active State Notification : Could not allocate message for %s \n",
 	 p_app_name);
     l_ret = -ENOMEM;
@@ -682,7 +681,7 @@ void AlSendAppSignal(DBusConnection * p_conn, char *p_app_name)
 				DBUS_TYPE_STRING, &l_interface,
 				DBUS_TYPE_STRING, &l_pid_property,
 				DBUS_TYPE_INVALID)) {
-    log_message
+    log_error_message
 	("AL Daemon Send Active State Notification : Could not append arguments to message for %s \n",
 	 p_app_name);
     l_ret = -ENOMEM;
@@ -694,7 +693,7 @@ void AlSendAppSignal(DBusConnection * p_conn, char *p_app_name)
   if (!(l_reply =
 	dbus_connection_send_with_reply_and_block(p_conn, l_msg, -1,
 						  &l_err))) {
-    log_message
+    log_error_message
 	("AL Daemon Send Active State Notification : Failed to issue method call for %s\n",
 	 p_app_name);
     l_ret = -EIO;
@@ -703,7 +702,7 @@ void AlSendAppSignal(DBusConnection * p_conn, char *p_app_name)
   /* parse reply and extract arguments */
   if (!dbus_message_iter_init(l_reply, &l_iter) ||
       dbus_message_iter_get_arg_type(&l_iter) != DBUS_TYPE_VARIANT) {
-    log_message
+    log_error_message
 	("AL Daemon Send Active State Notification : Failed to parse reply for %s\n",
 	 p_app_name);
     l_ret = -EIO;
@@ -713,7 +712,7 @@ void AlSendAppSignal(DBusConnection * p_conn, char *p_app_name)
   dbus_message_iter_recurse(&l_iter, &l_sub_iter);
   /* argument type check */
   if (dbus_message_iter_get_arg_type(&l_sub_iter) != DBUS_TYPE_UINT32) {
-    log_message
+    log_error_message
 	("AL Daemon Send Active State Notification : Failed to get arg type for %s when fetching pid!\n",
 	 p_app_name);
     l_ret = -EIO;
@@ -728,18 +727,18 @@ void AlSendAppSignal(DBusConnection * p_conn, char *p_app_name)
   /* extract the application state  */
   if (AlGetAppState(p_conn, p_app_name, l_state_info) == 0) {
 
-    log_message
+    log_debug_message
 	("AL Daemon Send Active State Notification : Received application state for %s \n",
 	 p_app_name);
 
     /* copy the state */
     l_app_status = strdup(l_state_info);
 
-    log_message
+    log_debug_message
 	(" AL Daemon Send Active State Notification : Global State information for %s -> [ %s ] \n",
 	 p_app_name, l_app_status);
 
-    log_message
+    log_debug_message
 	(" AL Daemon Send Active State Notification : Application state is %s \n",
 	 l_app_status);
 
@@ -793,10 +792,10 @@ void AlSendAppSignal(DBusConnection * p_conn, char *p_app_name)
     /* test if application is in a transitional state to activation */
     if (strcmp(l_active_state, "activating") == 0) {
       /* the task is in a transitional state to active */
-      log_message
+      log_debug_message
 	  ("AL Daemon Send Active State Notification : The application %s is in %s state and will be activated !",
 	   l_app_name, l_active_state);
-      log_message
+      log_debug_message
 	  ("AL Daemon Send Active State Notification : The new state for %s will be fetched after entering a stable state!",
 	   l_app_name);
       return;
@@ -805,10 +804,10 @@ void AlSendAppSignal(DBusConnection * p_conn, char *p_app_name)
     /* test if application is in a transitional state to deactivation */
     if (strcmp(l_active_state, "deactivating") == 0) {
       /* the task is in a transitional state to active */
-      log_message
+      log_debug_message
 	  ("AL Daemon Send Active State Notification : The application %s is in %s state and will be deactivated !",
 	   l_app_name, l_active_state);
-      log_message
+      log_debug_message
 	  ("AL Daemon Send Active State Notification : The new state for %s will be fetched after entering a stable state!",
 	   l_app_name);
       return;
@@ -817,10 +816,10 @@ void AlSendAppSignal(DBusConnection * p_conn, char *p_app_name)
     /* test if application is in a transitional state to reload */
     if (strcmp(l_active_state, "reloading") == 0) {
       /* the task is in a transitional state to active */
-      log_message
+      log_debug_message
 	  ("AL Daemon Send Active State Notification : The application %s is in %s state and will be reloaded !",
 	   l_app_name, l_active_state);
-      log_message
+      log_debug_message
 	  ("AL Daemon Send Active State Notification : The new state for %s will be fetched after entering a stable state!",
 	   l_app_name);
       return;
@@ -828,19 +827,19 @@ void AlSendAppSignal(DBusConnection * p_conn, char *p_app_name)
 
     /* check for message state */
     if (NULL == l_msg) {
-      log_message
+      log_error_message
 	  ("AL Daemon Send Active State Notification : for %s : Message Null\n",
 	   p_app_name);
 
       return;
     }
-    log_message
+    log_debug_message
 	("AL Daemon Send Active State Notification: Appending state arguments for %s\n",
 	 p_app_name);
 
     /* append arguments onto the end of message (signal) */
     dbus_message_iter_init_append(l_msg, &l_args);
-    log_message
+    log_debug_message
 	("AL Daemon Send Active State Notification : Initialized iterator for appending message arguments at end for %s\n",
 	 p_app_name);
 
@@ -848,19 +847,19 @@ void AlSendAppSignal(DBusConnection * p_conn, char *p_app_name)
     if (!dbus_message_iter_append_basic
 	(&l_args, DBUS_TYPE_STRING, &l_state_msg)) {
 
-      log_message
+      log_error_message
 	  ("AL Daemon Send Active State Notification : Could not append image path for %s!\n",
 	   p_app_name);
     }
 
     /* send the message and flush the connection */
     if (!dbus_connection_send(p_conn, l_msg, &l_serial)) {
-      log_message
+      log_error_message
 	  ("AL Daemon Send Active State Notification : for %s: Connection Out Of Memory!\n",
 	   p_app_name);
     }
 
-    log_message
+    log_debug_message
 	("AL Daemon Send Active State Notification for %s: Signal Sent\n",
 	 p_app_name);
   }

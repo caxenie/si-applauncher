@@ -55,6 +55,14 @@ PKG_CHECK_MODULES(GCONF, [ gconf-2.0 ])
 AC_SUBST(GCONF_CFLAGS)
 AC_SUBST(GCONF_LIBS)
 
+AC_ARG_ENABLE([debug],
+	    AS_HELP_STRING([--enable-debug],[Build al-daemon enabling syslog debug messages]),
+	    [case "${enableval}" in
+	    yes) debug=true ;;
+	    no) debug=false ;;
+	    *) AC_MSG_ERROR([bad value ${enableval} for --enable-debug]) ;;
+	esac],[debug=false])
+AM_CONDITIONAL([BUILD_WITH_DEBUG], [test "x$debug" = "xtrue"])
 
 # Checks for libraries.
 #AC_CHECK_HEADERS([glib.h],

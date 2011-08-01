@@ -25,6 +25,10 @@ al_daemon_CFLAGS = \
 		$(GCONF_LIBS) \
 		$(GCONF_CFLAGS)
 
+if BUILD_WITH_DEBUG
+    al_daemon_CFLAGS += -DDEBUG 
+endif
+
 # Dirs of external packages
 pkgconfigdatadir=$(datadir)/pkgconfig
 

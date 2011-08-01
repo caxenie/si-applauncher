@@ -52,21 +52,19 @@
 /* CLI commands */
 unsigned char g_stop = 0;
 unsigned char g_start = 0;
-/* initialize logging system */
-unsigned char g_verbose = 0;
 
 /* Function responsible with the command line interface output */
 void AlPrintCLI()
 {
   fprintf(stdout,
 	  "Syntax: \n"
-	  "   al-daemon --start|-S options \n"
+	  "   al-daemon --start|-S options\n"
 	  "   al-daemon --stop|-K\n"
 	  "   al-daemon --version|-V\n"
 	  "   al-daemon --help|-H\n"
 	  "\n"
 	  "Options: \n"
-	  "   --verbose|-v   prints the internal daemon log messages\n");
+	  "  --verbose|-v prints the internal daemon log messages\n");
 }
 
 /* Function responsible with command line options parsing */
@@ -100,10 +98,9 @@ void AlParseCLIOptions(int argc, char *const *argv)
       g_start = 1;
       break;
     case 'V':			/* print version */
-      fprintf(stdout, "\nAL Daemon version %s\n", AL_VERSION);
+      log_message("\nAL Daemon version %s\n", AL_VERSION);
       exit(0);
-    case 'v':			/* enable verbose */
-      g_verbose = 1;
+    case 'v' :
       break;
     default:
       AlPrintCLI();
@@ -168,13 +165,13 @@ void AlListenToMethodCall()
   /* connect to the bus and check for errors */
   l_conn = dbus_bus_get(DBUS_BUS_SYSTEM, &l_err);
   if (dbus_error_is_set(&l_err)) {
-    log_message
+    log_error_message
 	("AL Daemon Method Call Listener : Connection Error (%s)\n",
 	 l_err.message);
     dbus_error_free(&l_err);
   }
   if (NULL == l_conn) {
-    log_message("AL Daemon Method Call Listener : Connection Null!%s",
+    log_error_message("AL Daemon Method Call Listener : Connection Null!%s",
 		"\n");
     return;
   }
@@ -183,15 +180,15 @@ void AlListenToMethodCall()
       dbus_bus_request_name(l_conn, AL_SERVER_NAME,
 			    DBUS_NAME_FLAG_REPLACE_EXISTING, &l_err);
   if (dbus_error_is_set(&l_err)) {
-    log_message("AL Daemon Method Call Listener : Name Error (%s)\n",
+    log_error_message("AL Daemon Method Call Listener : Name Error (%s)\n",
 		l_err.message);
     dbus_error_free(&l_err);
   }
   if (DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER != l_ret) {
-    log_message
+    log_error_message
 	("AL Daemon Method Call Listener : Not Primary Owner (%d)! \n",
 	 l_ret);
-    log_message
+    log_error_message
 	("AL Daemon : Daemon will be stopped !%s","\n");
     system("killall -9 al-daemon");
   }
@@ -203,7 +200,7 @@ void AlListenToMethodCall()
 		     "interface='org.freedesktop.DBus.Properties',"
 		     "member='PropertiesChanged'", &l_err);
   if (dbus_error_is_set(&l_err)) {
-    log_message
+    log_error_message
 	("AL Daemon Method Call Listener : Failed to add signal matcher: %s\n",
 	 l_err.message);
     if (l_msg)
@@ -216,7 +213,7 @@ void AlListenToMethodCall()
 		     "interface='org.GENIVI.AppL'", &l_err);
 
   if (dbus_error_is_set(&l_err)) {
-    log_message
+    log_error_message
 	("AL Daemon Method Call Listener : Failed to add method call matcher: %s\n",
 	 l_err.message);
     if (l_msg)
@@ -231,7 +228,7 @@ void AlListenToMethodCall()
 				    "/org/freedesktop/systemd1",
 				    "org.freedesktop.systemd1.Manager",
 				    "Subscribe"))) {
-    log_message
+    log_error_message
 	("AL Daemon Method Call Listener : Could not allocate message when subscribing to systemd! \n %s \n",
 	 l_err.message);
     if (l_msg_notif)
@@ -245,7 +242,7 @@ void AlListenToMethodCall()
       (l_reply_notif =
        dbus_connection_send_with_reply_and_block(l_conn, l_msg_notif,
 						 -1, &l_err))) {
-    log_message
+    log_error_message
 	("AL Daemon Method Call Listener : Failed to issue method call: %s \n",
 	 l_err.message);
     if (l_msg_notif)
@@ -281,21 +278,16 @@ void AlListenToMethodCall()
                             DBUS_TYPE_STRING, &l_app,
 			    DBUS_TYPE_BOOLEAN, &l_fg_state,
 			    DBUS_TYPE_INVALID);
-      log_message
+      log_debug_message
 	("AL Daemon Method Call Listener Run: Arguments were extracted for %s\n",
 	 l_app);
       if ((strstr(l_app, "reboot") !=NULL) || (strstr(l_app, "poweroff") !=NULL)){
-	      printf("Deferred execution \n");
 	      strcpy(l_app_copy, l_app);
-	      printf("Application name copy %s\n", l_app_copy);
 	      l_app_deferred = strtok(l_app_copy, " ");
-              printf("Application name extraction %s\n", l_app_deferred);
 	      l_time = strtok(NULL, " ");
-              printf("Timing for deferred execution %s\n", l_time);
               strcpy(l_app, l_app_copy);
-	      printf("Application name for method call %s\n", l_app);
       }
-      log_message("AL Daemon Method Call Listener : Run app: %s\n", l_app);
+      log_debug_message("AL Daemon Method Call Listener : Run app: %s\n", l_app);
       /* if reboot / shutdown unit add deferred functionality in timer file */
       if (strstr(l_app, "reboot") != NULL) {
 	SetupUnitFileKey("/lib/systemd/system/reboot.timer",
@@ -308,13 +300,13 @@ void AlListenToMethodCall()
 
       /* check for application service file existence */
       if (!AppExistsInSystem(l_app)) {
-	log_message
+	log_error_message
 	    ("AL Daemon Method Call Listener : Cannot run %s !\n Application %s is not found in the system !\n",
 	     l_app, l_app);
 	continue;
       } else {
 	if ((l_r = (int) AppPidFromName(l_app)) != 0) {
-           log_message
+           log_error_message
 	      ("AL Daemon Method Call Listener : Cannot run %s !\n", l_app);
 	  /* check the application current state before starting it */
 	  /* extract the application state for testing existence */
@@ -355,7 +347,7 @@ void AlListenToMethodCall()
 	    if ((strcmp(l_sub_state, "exited") != 0)
 		|| (strcmp(l_sub_state, "dead") != 0)
 		|| (strcmp(l_sub_state, "failed") != 0)) {
-	      log_message
+	      log_error_message
 		  ("AL Daemon Method Call Listener : Cannot run %s !\n Application/application group %s is already running in the system !\n",
 		   l_app, l_app);
 	      continue;
@@ -369,7 +361,7 @@ void AlListenToMethodCall()
 				    "/org/freedesktop/systemd1",
 				    "org.freedesktop.systemd1.Manager",
 				    "LoadUnit"))) {
-	    log_message
+	    log_error_message
 		("AL Daemon Method Call Listener : Could not allocate message when loading unit for Run ! \n %s \n",
 		 l_err.message);
 	    if (l_load_msg)
@@ -387,7 +379,7 @@ void AlListenToMethodCall()
     if (!dbus_message_append_args(l_load_msg,
 				 DBUS_TYPE_STRING, &l_full_srv,
                                  DBUS_TYPE_INVALID)) {
-                    log_message
+                    log_error_message
 			("AL Daemon Method Call Listener : Failed to append app name for Run when loading : %s \n",
 			 l_err.message);
 		    if (l_load_msg)
@@ -401,7 +393,7 @@ void AlListenToMethodCall()
     if (!(l_load_reply =
        dbus_connection_send_with_reply_and_block(l_conn, l_load_msg,
 						 -1, &l_err))) {
-	    log_message
+	    log_error_message
 		("AL Daemon Method Call Listener : Failed to issue LoadUnit method call for Run: %s \n",
 		 l_err.message);
 	    if (l_load_msg)
@@ -413,7 +405,7 @@ void AlListenToMethodCall()
 	    }
       /* setup foreground property in systemd and wait for reply */
       if(SetupApplicationStartupState(l_conn, l_app , l_fg_state)!=0){
-		log_message("AL Daemon Method Call Listener : Cannot setup fg/bg state for %s , application will run in former state or default state \n" ,l_app);
+		log_error_message("AL Daemon Method Call Listener : Cannot setup fg/bg state for %s , application will run in former state or default state \n" ,l_app);
       }
       /* run the application */
       Run(l_pid, l_fg_state, 0, l_app);
@@ -438,7 +430,7 @@ void AlListenToMethodCall()
               strcpy(l_app, l_app_copy);
       }
       /* if reboot / shutdown unit add deferred functionality in timer file */
-      log_message("AL Daemon Method Call Listener : RunAs app: %s\n",
+      log_debug_message("AL Daemon Method Call Listener : RunAs app: %s\n",
 		  l_app);
       if (strstr(l_app, "reboot") != NULL ) {
 	SetupUnitFileKey("/lib/systemd/system/reboot.timer",
@@ -450,13 +442,13 @@ void AlListenToMethodCall()
       }
       /* check for application service file existence */
       if (!AppExistsInSystem(l_app)) {
-	log_message
+	log_error_message
 	    ("AL Daemon Method Call Listener : Cannot runas %s !\n Application %s is not found in the system !\n",
 	     l_app, l_app);
 	continue;
       } else {
 	if ((l_r = (int) AppPidFromName(l_app)) != 0) {
-	  log_message
+	  log_error_message
 	      ("AL Daemon Method Call Listener : Cannot runas %s !\n",
 	       l_app);
 
@@ -481,7 +473,7 @@ void AlListenToMethodCall()
 	    if ((strcmp(l_sub_state, "exited") != 0)
 		|| (strcmp(l_sub_state, "dead") != 0)
 		|| (strcmp(l_sub_state, "failed") != 0)) {
-	      log_message
+	      log_error_message
 		  ("AL Daemon Method Call Listener : Cannot runas %s !\n Application %s is already running in the system !\n",
 		   l_app, l_app);
 	      continue;
@@ -495,7 +487,7 @@ void AlListenToMethodCall()
 				    "/org/freedesktop/systemd1",
 				    "org.freedesktop.systemd1.Manager",
 				    "LoadUnit"))) {
-	    log_message
+	    log_error_message
 		("AL Daemon Method Call Listener : Could not allocate message when loading unit for RunAs ! \n %s \n",
 		 l_err.message);
 	    if (l_load_msg)
@@ -513,7 +505,7 @@ void AlListenToMethodCall()
     if (!dbus_message_append_args(l_load_msg,
 				 DBUS_TYPE_STRING, &l_full_srv,
                                  DBUS_TYPE_INVALID)) {
-                    log_message
+                    log_error_message
 			("AL Daemon Method Call Listener : Failed to append app name for RunAs when loading : %s \n",
 			 l_err.message);
 		    if (l_load_msg)
@@ -527,7 +519,7 @@ void AlListenToMethodCall()
     if (!(l_load_reply =
        dbus_connection_send_with_reply_and_block(l_conn, l_load_msg,
 						 -1, &l_err))) {
-	    log_message
+	    log_error_message
 		("AL Daemon Method Call Listener : Failed to issue LoadUnit method call for RunAs: %s \n",
 		 l_err.message);
 	    if (l_load_msg)
@@ -546,7 +538,7 @@ void AlListenToMethodCall()
        * the state setup. the time penalty is minimal 
        */
       if(SetupApplicationStartupState(l_conn, l_app, l_fg_state)!=0){
-		log_message("AL Daemon Method Call Listener : Cannot setup fg/bg state for %s , application will runas %d in former state or default state \n" ,l_app, l_uid_val);
+		log_error_message("AL Daemon Method Call Listener : Cannot setup fg/bg state for %s , application will runas %d in former state or default state \n" ,l_app, l_uid_val);
 		continue;
       }
     }
@@ -559,18 +551,18 @@ void AlListenToMethodCall()
 			    &l_pid, DBUS_TYPE_INVALID);
       /* extract application name from pid */
       l_r = (int) AppNameFromPid(l_pid, l_app);
-      log_message
+      log_debug_message
 	  ("AL Daemon Method Call Listener : Stopping application with pid %d\n",
 	   l_pid);
       if (l_r!=1) {
 	/* test for application service file existence */
 	if (!AppExistsInSystem(l_app)) {
-	  log_message
+	  log_error_message
 	      ("AL Daemon Method Call Listener : Cannot stop %s !\n Application %s is not found in the system !\n",
 	       l_app, l_app);
 	  continue;
 	}
-	log_message
+	log_error_message
 	      ("AL Daemon Method Call Listener : Cannot stop %s !\n", l_app);
 	/* check the application current state before stopping it */
 	/* extract the application state for testing existence */
@@ -613,7 +605,7 @@ void AlListenToMethodCall()
 	    && (strcmp(l_active_state, "activating") != 0)
 	    && (strcmp(l_active_state, "deactivating") != 0)) {
 
-	  log_message
+	  log_error_message
 	      ("AL Daemon Method Call Listener : Cannot stop %s !\n Application %s is already stopped !\n",
 	       l_app, l_app);
 	  continue;
@@ -632,7 +624,7 @@ void AlListenToMethodCall()
   	sprintf(l_cmd, "systemctl stop %s.service", l_app);
 	l_ret = system(l_cmd);
   	if (l_ret != 0) {
-       	log_message
+       	log_error_message
 	      ("AL Daemon Method Call Listener : Cannot stop %s !\n Application %s is already stopped !\n",
 	       l_app, l_app);	
 	}
@@ -643,7 +635,7 @@ void AlListenToMethodCall()
 	sprintf(l_cmd, "systemctl stop %s.target", l_app);
 	l_ret = system(l_cmd);
   	if (l_ret != 0) {
-       	log_message
+       	log_error_message
 	      ("AL Daemon Method Call Listener : Cannot stop %s !\n Application group %s is already stopped !\n",
 	       l_app, l_app);	
 	}
@@ -661,18 +653,18 @@ void AlListenToMethodCall()
 			    DBUS_TYPE_INVALID);
       /* extract application name from pid */
       l_r = (int) AppNameFromPid(l_pid, l_app);
-      log_message
+      log_debug_message
 	  ("AL Daemon Method Call Listener : Stopping application with pid %d using stopas !\n",
 	   l_pid);
       if (l_r!=1) {
 	/* test for application service file existence */
 	if (!AppExistsInSystem(l_app)) {
-	  log_message
+	  log_error_message
 	      ("AL Daemon Method Call Listener : Cannot stopas %s !\n Application %s is not found in the system !\n",
 	       l_app, l_app);
 	  continue;
 	}
-	log_message
+	log_error_message
 	      ("AL Daemon Method Call Listener : Cannot stopas %s !\n", l_app);
 	/* check the application current state before stopping it */
 	/* extract the application state for testing existence */
@@ -697,7 +689,7 @@ void AlListenToMethodCall()
 	    && (strcmp(l_active_state, "activating") != 0)
 	    && (strcmp(l_active_state, "deactivating") != 0)) {
 
-	  log_message
+	  log_error_message
 	      ("AL Daemon Method Call Listener : Cannot stopas %s !\n Application %s is already stopped !\n",
 	       l_app, l_app);
 	  continue;
@@ -715,18 +707,18 @@ void AlListenToMethodCall()
 			    &l_pid, DBUS_TYPE_INVALID);
       /* extract application name from pid */
       l_r = (int) AppNameFromPid(l_pid, l_app);
-      log_message
+      log_debug_message
 	  ("AL Daemon Method Call Listener : Resuming application %s\n",
 	   l_app);
       if (l_r!=1) {
 	/* test for application service file existence */
 	if (!AppExistsInSystem(l_app)) {
-	  log_message
+	  log_error_message
 	      ("AL Daemon Method Call Listener : Cannot resume %s !\n Application %s is not found in the system !\n",
 	       l_app, l_app);
 	  continue;
 	}
-        log_message
+        log_error_message
 	      ("AL Daemon Method Call Listener : Cannot resume %s !\n", l_app);
 	/* check the application current state before starting it */
 	/* extract the application state for testing existence */
@@ -750,7 +742,7 @@ void AlListenToMethodCall()
 	  if ((strcmp(l_sub_state, "exited") != 0)
 	      || (strcmp(l_sub_state, "dead") != 0)
 	      || (strcmp(l_sub_state, "failed") != 0)) {
-	    log_message
+	    log_error_message
 		("AL Daemon Method Call Listener : Cannot run %s !\n Application %s is already running in the system !\n",
 		 l_app, l_app);
 	    continue;
@@ -769,18 +761,18 @@ void AlListenToMethodCall()
 			    &l_pid, DBUS_TYPE_INVALID);
       /* extract application name from pid */
       l_r = (int) AppNameFromPid(l_pid, l_app);
-      log_message
+      log_debug_message
 	  ("AL Daemon Method Call Listener : Suspending application %s\n",
 	   l_app);
       if (l_r!=1) {
 	/* test for application service file existence */
 	if (!AppExistsInSystem(l_app)) {
-	  log_message
+	  log_error_message
 	      ("AL Daemon Method Call Listener : Cannot suspend %s !\n Application %s is not found in the system !\n",
 	       l_app, l_app);
 	  continue;
 	}
-	log_message
+	log_error_message
 	      ("AL Daemon Method Call Listener : Cannot suspend %s !\n ", l_app);
 	/* check the application current state before starting it */
 	/* extract the application state for testing existence */
@@ -805,7 +797,7 @@ void AlListenToMethodCall()
 	    && (strcmp(l_active_state, "activating") != 0)
 	    && (strcmp(l_active_state, "deactivating") != 0)) {
 
-	  log_message
+	  log_error_message
 	      ("AL Daemon Method Call Listener : Cannot suspend %s !\n Application %s is already suspended !\n",
 	       l_app, l_app);
 	  continue;
@@ -822,10 +814,10 @@ void AlListenToMethodCall()
       dbus_message_get_args(l_msg, &l_err, 
 			    DBUS_TYPE_STRING, &l_app,
 			    DBUS_TYPE_INVALID);
-      log_message("AL Daemon Method Call Listener : Restart app: %s\n", l_app);
+      log_debug_message("AL Daemon Method Call Listener : Restart app: %s\n", l_app);
       /* check for application service file existence */
       if (!AppExistsInSystem(l_app)) {
-	log_message
+	log_error_message
 	    ("AL Daemon Method Call Listener : Cannot restart %s !\n Application %s is not found in the system !\n",
 	     l_app, l_app);
 	continue;
@@ -843,7 +835,7 @@ void AlListenToMethodCall()
 
     /* test if the application is stopped */
     if(!l_pid){
-	log_message("AL Daemon Method Call Listener : Cannot change state because application doesn't exist or is stopped !%s", "\n");
+	log_error_message("AL Daemon Method Call Listener : Cannot change state because application doesn't exist or is stopped !%s", "\n");
 	continue;
     }
     /* extract application name from pid */
@@ -851,7 +843,7 @@ void AlListenToMethodCall()
       if (l_r!=1) {
 	/* test for application service file existence */
 	if (!AppExistsInSystem(l_app)) {
-	  log_message
+	  log_error_message
 	      ("AL Daemon Method Call Listener : Cannot change state for %s !\n Application %s is not found in the system !\n",
 	       l_app, l_app);
 	  continue;
@@ -859,14 +851,14 @@ void AlListenToMethodCall()
      }
       
       if(AppPidFromName(l_app)!=0){
-	log_message("AL Daemon Method Call Listener ChangeTaskState : Setting the state property for %s !\n ", l_app);
+	log_debug_message("AL Daemon Method Call Listener ChangeTaskState : Setting the state property for %s !\n ", l_app);
       
     /* get unit object path */ 
   if (!(l_msg_state = dbus_message_new_method_call("org.freedesktop.systemd1",
 					     	   "/org/freedesktop/systemd1",
 					     	   "org.freedesktop.systemd1.Manager",
 					     	   "GetUnit"))) {
-    log_message
+    log_error_message
 	("AL Daemon ChangeTaskState  : Could not allocate message for %s\n",
 	 l_app);
     if (l_msg_state)
@@ -882,7 +874,7 @@ void AlListenToMethodCall()
   if (!dbus_message_append_args(l_msg_state,
 				DBUS_TYPE_STRING, &l_app_string,
 				DBUS_TYPE_INVALID)) {
-        log_message
+        log_error_message
 	("AL Daemon ChangeTaskState  : Could not append arguments to message for %s\n",
 	 l_app);
     if (l_msg_state)
@@ -891,17 +883,17 @@ void AlListenToMethodCall()
      dbus_error_free(&l_err);
    continue;
   }
-  log_message
+  log_debug_message
 	("AL Daemon ChangeTaskState  : Appended message args to fetch object path for %s\n",
 	 l_app);
   /* send the message on the bus and wait for a reply */
   if (!(l_reply_state =
 	dbus_connection_send_with_reply_and_block(l_conn, l_msg_state, -1,
 						  &l_err))) {
-    log_message
+    log_error_message
 	("AL Daemon ChangeTaskState  : Unknown information for %s \n",
 	 l_app);
-    log_message
+    log_error_message
 	("AL Daemon ChangeTaskState  : Error [%s: %s]\n",
 	 l_err.name, l_err.message);
     if (l_msg_state)
@@ -912,7 +904,7 @@ void AlListenToMethodCall()
     dbus_error_free(&l_err);
    continue;
   }
-  log_message
+  log_debug_message
 	("AL Daemon ChangeTaskState  : Object path fetch message sent and block for reply for %s\n",
 	 l_app);
 
@@ -920,7 +912,7 @@ void AlListenToMethodCall()
   if (!dbus_message_get_args(l_reply_state, &l_err,
 			     DBUS_TYPE_OBJECT_PATH, &l_path,
 			     DBUS_TYPE_INVALID)) {
-    log_message
+    log_error_message
 	("AL Daemon ChangeTaskState  : Failed to parse reply for %s\n",
 	 l_app);
     if (l_msg_state)
@@ -931,7 +923,7 @@ void AlListenToMethodCall()
      dbus_error_free(&l_err);
    continue;
   }
-  log_message
+  log_debug_message
 	("AL Daemon ChangeTaskState  : Extracted object path for %s\n",
 	 l_app);
   /* unreference the message */
@@ -944,7 +936,7 @@ void AlListenToMethodCall()
 				    "org.freedesktop.DBus.Properties", 
 				    "Set"))) { 
 
-    log_message
+    log_error_message
 	("AL Daemon Method Call Listener : Could not allocate message when setting state property to systemd! \n %s \n",
 	 l_err.message);
     if (l_msg_state)
@@ -954,24 +946,24 @@ void AlListenToMethodCall()
     dbus_error_free(&l_err);
     continue;
   }
-  log_message
+  log_debug_message
 	("AL Daemon ChangeTaskState  : Called property set method call for %s\n",
 	 l_app);
    /* initialize the iterator for arguments append */
    dbus_message_iter_init_append(l_msg_state, &l_iter);
-  log_message
+  log_debug_message
 	("AL Daemon ChangeTaskState  : Initialized iterator for property value setup method call for %s\n", l_app);
    /* append interface for property setting */
    char *l_iface = "org.freedesktop.systemd1.Service";
    if(!dbus_message_iter_append_basic(&l_iter, 
 				      DBUS_TYPE_STRING, 
 				      &l_iface)){
-	log_message
+	log_error_message
 	("AL Daemon ChangeTaskState : Could not append interface to message for %s \n",
 	 l_app);
 	continue;
    }
-   log_message
+   log_debug_message
 	("AL Daemon ChangeTaskState  : Appended interface name for property set for %s\n",
 	 l_app);
    /* append property name */
@@ -979,12 +971,12 @@ void AlListenToMethodCall()
    if(!dbus_message_iter_append_basic(&l_iter, 
 				      DBUS_TYPE_STRING, 
 				      &l_prop)){ 
-	log_message
+	log_error_message
 	("AL Daemon ChangeTaskState : Could not append property to message for %s \n",
 	 l_app);
 	continue;
    }
-   log_message
+   log_debug_message
 	("AL Daemon ChangeTaskState  : Appended property name to setup for %s\n",
 	 l_app);
    /* append the variant that stores the value for the foreground state property */
@@ -992,37 +984,37 @@ void AlListenToMethodCall()
 				     DBUS_TYPE_VARIANT, 
 				     DBUS_TYPE_BOOLEAN_AS_STRING,
 				     &l_variant)){
-	log_message("AL Daemon ChangeTaskState : Not enough memory to open container %s" ,"\n");
+	log_error_message("AL Daemon ChangeTaskState : Not enough memory to open container %s" ,"\n");
 	continue;
     }
-    log_message
+    log_debug_message
 	("AL Daemon ChangeTaskState  : Opened container for property value setup for %s\n",
 	 l_app);
     dbus_bool_t l_state = (dbus_bool_t)l_fg_state;
     if(!dbus_message_iter_append_basic (&l_variant, 
 				        DBUS_TYPE_BOOLEAN,  
                                         &l_state)){
-    	log_message
+    	log_error_message
 	("AL Daemon ChangeTaskState : Could not append property value to message for %s \n",
 	 l_app);
      	continue;
     }
-    log_message
+    log_debug_message
 	("AL Daemon ChangeTaskState  : Set the state (fg/bg) value in variant for %s\n",
 	 l_app);
     if(!dbus_message_iter_close_container (&l_iter, 
 					   &l_variant)){
-	log_message("AL Daemon ChangeTaskState : Not enough memory to close container %s" ,"\n");
+	log_error_message("AL Daemon ChangeTaskState : Not enough memory to close container %s" ,"\n");
 	continue;
     }
-    log_message
+    log_debug_message
 	("AL Daemon ChangeTaskState  : Closed container for property value setup for %s\n",
 	 l_app);     
    /* wait for the reply from systemd after setting the state (fg/bg) property */
    if (!(l_reply_state =
        dbus_connection_send_with_reply_and_block(l_conn, l_msg_state,
 						 -1, &l_err))) {
-    	log_message
+    	log_error_message
 	("AL Daemon Method Call Listener : Didn't received a reply for state property method call: %s \n",l_err.message);
     if (l_msg_state)
       dbus_message_unref(l_msg_state);
@@ -1032,9 +1024,9 @@ void AlListenToMethodCall()
     continue;
    }
    
-   log_message("AL Daemon Method Call Listener ChangeTaskState : Reply after setting state for %s was received!\n ", l_app);
+   log_debug_message("AL Daemon Method Call Listener ChangeTaskState : Reply after setting state for %s was received!\n ", l_app);
 	
-   log_message("AL Daemon Method Call Listener ChangeTaskState : Broadcast state change notification for %s !\n ", l_app);
+   log_debug_message("AL Daemon Method Call Listener ChangeTaskState : Broadcast state change notification for %s !\n ", l_app);
      
      /* send notification anouncing that an application changed state (fg/bg) 
       * used if needed  
@@ -1043,7 +1035,7 @@ void AlListenToMethodCall()
      AlChangeTaskStateNotifier(l_conn, l_app, (l_fg_state==TRUE)?"TRUE":"FALSE");
 #endif
 
-   log_message("AL Daemon Method Call Listener ChangeTaskState : State change notification was sent for %s !\n ", l_app);			
+   log_debug_message("AL Daemon Method Call Listener ChangeTaskState : State change notification was sent for %s !\n ", l_app);			
     ChangeTaskState(l_pid, l_fg_state);       
     }
  }
@@ -1056,7 +1048,7 @@ void AlListenToMethodCall()
       /* initialize reply iterators */
       DBusMessageIter l_iter, l_sub_iter;
 
-      log_message
+      log_debug_message
 	  ("AL Daemon Signal Listener : An application changed state !%s",
 	   "\n");
       /* get object path for message */
@@ -1065,7 +1057,7 @@ void AlListenToMethodCall()
       if (!dbus_message_get_args(l_msg, &l_err,
 				 DBUS_TYPE_STRING, &l_interface,
 				 DBUS_TYPE_INVALID)) {
-	log_message
+	log_error_message
 	    ("AL Daemon Method Call Listener : Failed to parse message: %s",
 	     l_err.message);
 	if (l_msg)
@@ -1090,7 +1082,7 @@ void AlListenToMethodCall()
 	   dbus_message_new_method_call("org.freedesktop.systemd1", l_path,
 					"org.freedesktop.DBus.Properties",
 					"Get"))) {
-	log_message
+	log_error_message
 	    ("AL Daemon Method Call Listener : Could not allocate message for %s !\n",
 	     l_path);
 	if (l_msg)
@@ -1103,7 +1095,7 @@ void AlListenToMethodCall()
 				    DBUS_TYPE_STRING, &l_interface,
 				    DBUS_TYPE_STRING, &l_property,
 				    DBUS_TYPE_INVALID)) {
-	log_message
+	log_error_message
 	    ("AL Daemon Method Call Listener : Could not append arguments to message for %s !\n",
 	     l_path);
 	if (l_msg)
@@ -1116,7 +1108,7 @@ void AlListenToMethodCall()
 	  (l_reply =
 	   dbus_connection_send_with_reply_and_block(l_conn,
 						     l_msg, -1, &l_err))) {
-	log_message
+	log_error_message
 	    ("AL Daemon Signal Listener : No reply received. Unable to issue method call: %s",
 	     l_err.message);
 	if (l_msg)
@@ -1129,7 +1121,7 @@ void AlListenToMethodCall()
       /* initialize the reply iterator and check argument type */
       if (!dbus_message_iter_init(l_reply, &l_iter) ||
 	  dbus_message_iter_get_arg_type(&l_iter) != DBUS_TYPE_VARIANT) {
-	log_message
+	log_error_message
 	    ("AL Daemon Signal Call Listener : Failed to parse reply for %s !\n",
 	     l_path);
 	if (l_msg)
@@ -1147,7 +1139,7 @@ void AlListenToMethodCall()
 	/* verify the argument type */
 	if (dbus_message_iter_get_arg_type(&l_sub_iter) !=
 	    DBUS_TYPE_STRING) {
-	  log_message
+	  log_error_message
 	      ("AL Daemon Method Call Listener : Failed to parse reply for %s !",
 	       l_path);
 	  if (l_msg)
@@ -1159,7 +1151,7 @@ void AlListenToMethodCall()
 	}
 	/* extract the application id from the signal */
 	dbus_message_iter_get_basic(&l_sub_iter, &l_id);
-	log_message("AL Daemon Method Call Listener : Unit %s changed.\n",
+	log_debug_message("AL Daemon Method Call Listener : Unit %s changed.\n",
 		    l_id);
         /* notify clients about tasks global state changes */
 	AlAppStateNotifier(l_conn, (char *) l_id);
@@ -1180,18 +1172,18 @@ void AlSignalHandler(int p_sig)
 {
     switch(p_sig) {
 	    case SIGTERM:
-		log_message("AL Daemon : Application launcher received TERM signal ...%s","\n");
-		log_message("AL Daemon : Application launcher daemon exiting ....%s","\n");
-		log_message("AL Daemon : Removing lock file %s \n", AL_PID_FILE);
+		log_debug_message("AL Daemon : Application launcher received TERM signal ...\n", 0);
+		log_debug_message("AL Daemon : Application launcher daemon exiting ....\n", 0);
+		log_debug_message("AL Daemon : Removing lock file %s \n", AL_PID_FILE);
 		remove(AL_PID_FILE);
-		fprintf(stdout, "AL Daemon : Daemon exited !%s","\n");
+		log_message("AL Daemon : Daemon exited !\n", 0);
                 exit(EXIT_SUCCESS);
 		break;
 	    case SIGKILL:
-		log_message("AL Daemon : Application launcher received KILL signal ...%s","\n");
+		log_debug_message("AL Daemon : Application launcher received KILL signal ...\n", 0);
 		break;
  	    default:
-		log_message("AL Daemon : Daemon received unhandled signal %s\n!", strsignal(p_sig));
+		log_debug_message("AL Daemon : Daemon received unhandled signal %s\n!", strsignal(p_sig));
 		break;
         }
 }
@@ -1201,6 +1193,15 @@ int main(int argc, char **argv)
 {
   /* return code */
   int l_ret;
+  /* logging mechanism */
+  int log =  LOG_MASK (LOG_ERR) | LOG_MASK (LOG_INFO);
+#ifdef DEBUG
+  log = log | LOG_MASK(LOG_DEBUG);
+#endif
+
+  openlog ("AL-DAEMON", 0x0, LOG_USER);
+  setlogmask(log);
+
   /* handle signals */
   signal(SIGTERM, AlSignalHandler);
   signal(SIGKILL, AlSignalHandler);
@@ -1216,16 +1217,19 @@ int main(int argc, char **argv)
   if (g_start) {
     /* daemonize the application launcher */
     AlDaemonize();
-    log_message("AL Daemon : Daemon process was started !%s","\n");
+    log_message("AL Daemon : Daemon process was started !\n", 0);
     /* initialise the last user mode */
     if(!(l_ret=InitializeLastUserMode())){
-      log_message("AL Daemon : Last user mode initialization failed !%s","\n");
+      log_error_message("AL Daemon : Last user mode initialization failed !\n", 0);
     }
-    else { log_message("AL Daemon : Last user mode initialized. Listening for method calls ....%s","\n");
+    else { log_message("AL Daemon : Last user mode initialized. Listening for method calls ....\n", 0);
     }
     /* start main daemon loop */
     AlListenToMethodCall();
   }
+  log_message("AL Daemon : Daemon exited !\n", 0);
+  /* close logging mechanism */
+  closelog ();
 
   return 0;
 }

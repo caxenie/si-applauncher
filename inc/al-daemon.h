@@ -38,6 +38,8 @@
 #define AL_GCONF_CURRENT_USER_KEY "/current_user"
 #define AL_GCONF_LAST_USER_MODE_KEY "/last_mode"
 #define AL_PID_FILE "/var/run/al-daemon.pid"
+/* add logging support */
+#include "al-log.h"
 
 #define DBUS_SRM_INTROSPECT_XML "" \
         "<!DOCTYPE node PUBLIC \"-//freedesktop//DTD "\
@@ -105,16 +107,6 @@
         "    </signal>\n"\
         "  </interface>\n"\
         "</node>\n"
-
-/* Tracing support */
-extern unsigned char g_verbose;
-
-/* macro for logging */
-#define log_message(format,args...) \
-			do{ \
-			    if(g_verbose) \
-				    fprintf(stdout,format,args); \
-			  } while(0);
 
 /* Function responsible with the command line interface output */
 extern void AlPrintCLI();
