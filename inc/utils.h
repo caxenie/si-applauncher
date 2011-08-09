@@ -39,3 +39,7 @@ extern int SetupApplicationStartupState(DBusConnection *p_conn, char *p_app, boo
  * when running application with variable command line parameters.
  */
 extern char *ExtractUnitNameTemplate(char *unit_name);
+/* Function responsible for getting unit object path
+ * NOTE: result should be freed with free() 
+ */
+char *GetUnitObjectPath(DBusConnection *p_conn, char *p_app_name);
