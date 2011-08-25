@@ -19,19 +19,19 @@
 */
 
 /* High level interface for the AL Daemon */
-extern void Run(int newPID, bool isFg, int parentPID, char *commandLine);
-extern void RunAs(int euid, int egid, int newPID, bool isFg, int parentPID, char *commandLine);
+extern void Run(char *p_commandLine, int p_parentPID, bool p_isFg, int p_newPID);
+extern void RunAs(char *p_commandLine, int p_parentPID, bool p_isFg, int p_euid, int p_egid, int p_newPID);
 extern void Suspend(int pid);
 extern void Resume(int pid);
 extern void Stop(int pid);
 extern void StopAs(int pid, int euid, int egid);
 extern void ChangeTaskState(int pid, bool isFg);
 /* Send start/stop signals over the bus to the clients */
-extern void TaskStarted(char *imagePath, int pid);
-extern void TaskStopped(char *imagePath, int pid);
+extern void TaskStarted(int p_pid, char *p_imagePath);
+extern void TaskStopped(int p_pid, char *p_imagePath);
 /* Function responsible with restarting an application when SHM detects an abnormal operation of the application */
 extern void Restart(char *app_name);
-/* Receive the method calls and reply */
-extern void AlReplyToMethodCall(DBusMessage * msg, DBusConnection * conn);/*
-/* Replies to Introspection request */
-void ReplyToIntrospect(DBusMessage *p_msg, DBusConnection *p_conn);
+/* Function responsible to dispatch and emit signals according to context */
+extern void al_dbus_signal_dispatcher();
+/* Function responsible to monitor signals of interest for the daemon */
+extern int al_monitor_signals(DBusConnection *bus);

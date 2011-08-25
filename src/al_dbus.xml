@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!-- Wind River AL Daemon -  DBus interface -->
+
+<node name="/org/GENIVI/AppL">
+  <!--
+  /**
+  * org.GENIVI.AppL
+  *
+  * Contains the implementation of the exported Dbus API functions for the AL Daemon
+  *
+  * 		method calls : RUN, RUNAS, STOP, STOPAS, SUSPEND, RESUME, CHANGE TASK STATE
+  *	        signals : TASK STARTED, TASK STOPPED, CHANGE TASK STATE COMPLETE, GLOBAL STATE NOTIFICATION
+  *
+  * Object path:
+  *     /org/GENIVI/AppL
+  *
+  */
+  -->
+  <interface name="org.GENIVI.AppL">
+	<annotation name="org.freedesktop.DBus.GLib.CSymbol" value="al_dbus"/>
+	 <method name="Run"> 
+		      <arg name="command_line" type="s" direction="in"/>
+                 <!-- <arg name="parent_pid" type="i" direction="out"/> -->
+		      <arg name="foreground" type="b" direction="in"/>
+		      <arg name="new_pid" type="i" direction="out"/>
+            </method>
+            <method name="RunAs">
+		      <arg name="command_line" type="s" direction="in"/>
+                 <!-- <arg name="parent_pid" type="i" direction="out"/> -->
+		      <arg name="foreground" type="b" direction="in"/>
+		      <arg name="app_uid" type="i" direction="in"/>
+		      <arg name="app_gid" type="i" direction="in"/>
+		      <arg name="new_pid" type="i" direction="out"/>
+            </method>
+            <method name="Stop">
+		      <arg name="app_pid" type="u" direction="in"/>
+            </method>
+            <method name="StopAs">
+		      <arg name="app_pid" type="u" direction="in"/>
+		      <arg name="app_uid" type="i" direction="in"/>
+		      <arg name="app_gid" type="i" direction="in"/>
+            </method>
+            <method name="Resume">
+		      <arg name="app_pid" type="u" direction="in"/>
+            </method>
+            <method name="Suspend">
+		      <arg name="app_pid" type="u" direction="in"/>
+            </method>
+            <method name="Restart">
+		      <arg name="app_name" type="s" direction="in"/>
+            </method>
+            <method name="ChangeTaskState">
+		      <arg name="app_pid" type="i" direction="in"/>
+		      <arg name="foreground" type="b" direction="in"/>
+            </method>
+ 	    <signal name="GlobalStateNotification">
+		       <arg name="app_status" type="s"/>
+            </signal>
+            <signal name="TaskStarted">
+		      <arg name="app_pid" type="i"/>
+		      <arg name="image_path" type="s"/>
+            </signal>
+            <signal name="TaskStopped">
+		      <arg name="app_pid" type="i"/>
+		      <arg name="image_path" type="s"/>
+            </signal>
+	    <signal name="ChangeTaskStateComplete">
+		      <arg name="app_name" type="s"/>
+		      <arg name="app_state" type="s"/>
+            </signal>
+  </interface>
+</node>

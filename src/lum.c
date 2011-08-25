@@ -276,7 +276,7 @@ int StartUserModeApps(GConfClient *p_client, char *p_user)
 	 /* get app name */
 	 l_app = (char*)g_slist_nth_data(l_app_list, l_idx);
          /* run application */
- 	 Run(l_app_pid, TRUE, 0, l_app);
+ 	 Run(l_app, 0, TRUE, l_app_pid);
 	 log_debug_message("AL Daemon Start User Mode Apps : Started %s for user %s !\n", l_app, p_user);
   }
   log_debug_message("AL Daemon Start User Mode Apps : Last user mode applications for user %s was setup!\n", p_user);

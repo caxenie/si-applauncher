@@ -46,6 +46,8 @@
 #include "notifier.h"
 #include "dbus_interface.h"
 
+extern ALDbus *g_al_dbus;
+
 /* 
  * Function responsible to extract the status of an application after starting it or that is already running in the system. 
  * This refers to extracting : Load State, Active State and Sub State.
@@ -80,12 +82,12 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
   if (NULL == (l_path = GetUnitObjectPath(p_bus, p_app_name)))
   {
           log_error_message
-                  ("AL Daemon State Extractor : Unable to extract object path for %s", p_app_name);
+                  ("Active State Extractor : Unable to extract object path for %s", p_app_name);
           l_ret = -1;
           goto free_res;
   }
   log_debug_message
-          ("AL Daemon State Extractor : Extracted object path for %s\n",
+          ("Active State Extractor : Extracted object path for %s\n",
            p_app_name);
   /* issue a new method call to extract properties for the unit */
   if (!(l_msg = dbus_message_new_method_call("org.freedesktop.systemd1",
@@ -93,7 +95,7 @@ int AlGetAppState(DBusConnection * p_bus, char *p_app_name,
 					     "org.freedesktop.DBus.Properties",
 					     "Get"))) {
     log_error_message
-	("AL Daemon Active State Extractor : Could not allocate message for %s \n",
+	("Active State Extractor : Could not allocate message for %s \n",
 	 p_app_name);
     l_ret = -ENOMEM;
     goto free_res;
@@ -324,141 +326,20 @@ void AlAppStateNotifier(DBusConnection *p_conn, char *p_app_name)
   char *l_app_status;
 
   log_debug_message
-      ("AL Daemon Send Notification : Sending signal with value %s\n",
+      ("Send Notification : Sending signal with value %s\n",
        p_app_name);
 
   /* extract the information to broadcast */
   log_debug_message
-      ("AL Daemon Send Notification : Getting application state for %s \n",
+      ("Send Notification : Getting application state for %s \n",
        p_app_name);
 
 
   /* extract the application state  */
   if (AlGetAppState(p_conn, p_app_name, l_state_info) == 0) {
-
-    log_debug_message
-	("AL Daemon Send Notification : Received application state for %s \n",
-	 p_app_name);
-
-    /* copy the state */
-    l_app_status = strdup(l_state_info);
-    log_debug_message
-	(" AL Daemon Send Notification : Global State information for %s -> [ %s ] \n",
-	 p_app_name, l_app_status);
-
-    /* create a signal for global state notification & check for errors */
-    l_msg = dbus_message_new_signal(SRM_OBJECT_PATH,
-				    AL_SIGNAL_INTERFACE,
-				    "GlobalStateNotification");
-
-    /* check for message state */
-    if (NULL == l_msg) {
-      log_error_message("AL Daemon Send Notification for %s : Message Null\n",
-		  p_app_name);
-      return;
-    }
-    log_debug_message
-	("AL Daemon Send Notification : Appending state arguments for %s\n",
-	 p_app_name);
-
-    /* append arguments onto the end of message (signal) */
-    dbus_message_iter_init_append(l_msg, &l_args);
-    log_debug_message
-	("AL Daemon Send Notification : Initialized iterator for appending message arguments at end for %s\n",
-	 p_app_name);
-    /* append status information encoded in a string */
-    if (!dbus_message_iter_append_basic
-	(&l_args, DBUS_TYPE_STRING, &l_app_status)) {
-
-      log_error_message
-	  ("AL Daemon Method Caller : Could not append args for status extraction message for %s!\n",
-	   p_app_name);
-    }
-    log_debug_message
-	("AL Daemon Send Notification : Sending the state message for %s\n",
-	 p_app_name);
-
-    /* send the message and flush the connection */
-    if (!dbus_connection_send(p_conn, l_msg, &l_serial)) {
-      log_error_message
-	  ("AL Daemon Send Notification for %s: Connection Out Of Memory!\n",
-	   p_app_name);
-    }
-
-    log_debug_message("AL Daemon Send Notification for %s: Signal Sent\n",
-		p_app_name);
-
-    /* free the message */
-    dbus_message_unref(l_msg);
+    /* notify clients about tasks global state changes */
+    al_dbus_global_state_notification(g_al_dbus, l_state_info);
   }
-}
-
-/* 
- * Function responsible to issue a notification after a task chnages state (fg/bg) 
- */
-void AlChangeTaskStateNotifier(DBusConnection *p_conn, char *p_app_name, char *p_app_state)
-{
-
-  /* message to be sent */
-  DBusMessage *l_msg;
-  /* message arguments */
-  DBusMessageIter l_args;
-  /* return code */
-  int l_ret;
-  /* reply information */
-  dbus_uint32_t l_serial = 0;
-
-  log_debug_message
-      ("AL Daemon Send ChangeTaskStateComplete Notification : Sending signal for application %s with state %s \n", p_app_name, p_app_state);
-
-    /* create a signal for fg/bg state notification & check for errors */
-    l_msg = dbus_message_new_signal(SRM_OBJECT_PATH,
-				    AL_SIGNAL_INTERFACE,
-				    "ChangeTaskStateComplete");
-
-    /* check errors on message to be sent */
-    if (NULL == l_msg) {
-      log_error_message("AL Daemon Send ChangeTaskStateComplete Notification for %s : Message Null\n",
-		  p_app_name);
-      return;
-    }
-    log_debug_message
-	("AL Daemon Send ChangeTaskStateComplete Notification : Appending state arguments for %s\n",
-	 p_app_name);
-
-    /* append arguments to the message (signal) */
-    dbus_message_iter_init_append(l_msg, &l_args);
-    log_debug_message
-	("AL Daemon Send ChangeTaskStateComplete Notification : Initialized iterator for appending message arguments at end for %s\n",
-	 p_app_name);
-    /* append status (fg/bg) information encoded in a string */
-    if (!dbus_message_iter_append_basic
-	(&l_args, DBUS_TYPE_STRING, &p_app_name)) {
-      log_error_message
-	  ("AL Daemon Send ChangeTaskStateComplete Notification : Could not append app name for %s!\n", p_app_name);
-    }
-    if (!dbus_message_iter_append_basic
-	(&l_args, DBUS_TYPE_STRING, &p_app_state)) {
-
-      log_error_message
-	  ("AL Daemon Send ChangeTaskStateComplete Notification : Could not append app state for %s!\n", p_app_name);
-    }
-    log_debug_message
-	("AL Daemon Send ChangeTaskStateComplete Notification : Sending the state message for %s\n",
-	 p_app_name);
-
-    /* send the message and flush the connection */
-    if (!dbus_connection_send(p_conn, l_msg, &l_serial)) {
-      log_error_message
-	  ("AL Daemon Send ChangeTaskStateComplete Notification for %s: Connection Out Of Memory!\n",
-	   p_app_name);
-    }
-
-    log_debug_message("AL Daemon Send ChangeTaskStateComplete Notification for %s: Signal Sent\n",
-		p_app_name);
-
-  /* free the message */
-  dbus_message_unref(l_msg);
 }
 
 /* Connect to the DBUS bus and send a broadcast signal about the state of the application */
@@ -606,45 +487,23 @@ void AlSendAppSignal(DBusConnection * p_conn, char *p_app_name)
     l_active_state = strtok(NULL, l_delim_serv);
     l_active_state = strtok(NULL, l_delim_serv);
     l_app_name = strtok(l_service_name, l_delim_app);
-    /* form the application status message to send */
-    strcpy(l_state_msg, l_app_name);
-    strcat(l_state_msg, " ");
-    sprintf(l_pid_string, "%d", l_pid);
-    strcat(l_state_msg, l_pid_string);
-    strcat(l_state_msg, " ");
 
     /* test if application was started and signal this event */
     if (strcmp(l_active_state, "active") == 0) {
-
-      /* append to dbus signal the application status */
-      strcat(l_state_msg, AL_SIGNAME_TASK_STARTED);
-      TaskStarted(l_app_name, l_pid);
-      /* create a signal & check for errors */
-      l_msg = dbus_message_new_signal(SRM_OBJECT_PATH,
-				      AL_SIGNAL_INTERFACE,
-				      AL_SIGNAME_TASK_STARTED);
+      /* emit signal */
+      al_dbus_task_started(g_al_dbus, l_pid, l_app_name);
     }
 
     /* test if application was stopped and became inactive and signal this event */
     if (strcmp(l_active_state, "inactive") == 0) {
-      /* append to dbus signal the application status */
-      strcat(l_state_msg, AL_SIGNAME_TASK_STOPPED);
-      TaskStopped(l_app_name, l_pid);
-      /* create a signal & check for errors */
-      l_msg = dbus_message_new_signal(SRM_OBJECT_PATH,
-				      AL_SIGNAL_INTERFACE,
-				      AL_SIGNAME_TASK_STOPPED);
+      /* emit signal */
+      al_dbus_task_stopped(g_al_dbus, l_pid, l_app_name);
     }
 
     /* test if application failed and stopped and signal this event */
     if (strcmp(l_active_state, "failed") == 0) {
-      /* append to dbus signal the application status */
-      strcat(l_state_msg, AL_SIGNAME_TASK_STOPPED);
-      TaskStopped(l_app_name, l_pid);
-      /* create a signal & check for errors */
-      l_msg = dbus_message_new_signal(SRM_OBJECT_PATH,
-				      AL_SIGNAL_INTERFACE,
-				      AL_SIGNAME_TASK_STOPPED);
+       /* emit signal */
+      al_dbus_task_stopped(g_al_dbus, l_pid, l_app_name);
     }
 
     /* test if application is in a transitional state to activation */
@@ -668,7 +527,7 @@ void AlSendAppSignal(DBusConnection * p_conn, char *p_app_name)
       log_debug_message
 	  ("AL Daemon Send Active State Notification : The new state for %s will be fetched after entering a stable state!",
 	   l_app_name);
-      goto free_res;
+       return;
     }
 
     /* test if application is in a transitional state to reload */
@@ -680,54 +539,19 @@ void AlSendAppSignal(DBusConnection * p_conn, char *p_app_name)
       log_debug_message
 	  ("AL Daemon Send Active State Notification : The new state for %s will be fetched after entering a stable state!",
 	   l_app_name);
-      goto free_res;
+	return;
     }
-
-    /* check for message state */
-    if (NULL == l_msg) {
-      log_error_message
-	  ("AL Daemon Send Active State Notification : for %s : Message Null\n",
-	   p_app_name);
-      goto free_res;
-    }
-    log_debug_message
-	("AL Daemon Send Active State Notification: Appending state arguments for %s\n",
-	 p_app_name);
-
-    /* append arguments onto the end of message (signal) */
-    dbus_message_iter_init_append(l_msg, &l_args);
-    log_debug_message
-	("AL Daemon Send Active State Notification : Initialized iterator for appending message arguments at end for %s\n",
-	 p_app_name);
-
-    /* append status information encoded in a string */
-    if (!dbus_message_iter_append_basic
-	(&l_args, DBUS_TYPE_STRING, &l_state_msg)) {
-
-      log_error_message
-	  ("AL Daemon Send Active State Notification : Could not append image path for %s!\n",
-	   p_app_name);
-    }
-
-    /* send the message and flush the connection */
-    if (!dbus_connection_send(p_conn, l_msg, &l_serial)) {
-      log_error_message
-	  ("AL Daemon Send Active State Notification : for %s: Connection Out Of Memory!\n",
-	   p_app_name);
-    }
-
-    log_debug_message
-	("AL Daemon Send Active State Notification for %s: Signal Sent\n",
-	 p_app_name);
   }
+ 
+  return;
 
 free_res:
-  /* free the messages */
-  if (l_msg)
-    dbus_message_unref(l_msg);
-
-  if (l_reply)
-    dbus_message_unref(l_reply);
+  /* resources free */
+  if(l_active_state) free(l_active_state);
+  if(l_sub_state) free(l_sub_state);
+  if(l_app_name) free(l_app_name);
+  if(l_service_name) free(l_service_name);
+  if(l_state_msg) free(l_state_msg);
   /* free the error */
   dbus_error_free(&l_err);
   /* free unit object path string */

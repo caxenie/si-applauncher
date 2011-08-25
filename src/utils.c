@@ -752,3 +752,25 @@ char *ExtractUnitNameTemplate(char *unit_name) {
         return l_res;
 }
 
+/* Function responsible to extract the service interface from the path.
+ * Useful when determining which properties are available for the 
+ * specific service of interest.
+ */
+gchar * GetInterfaceFromPath (gchar * unit_path){ 
+    gchar * interface;    
+    
+        if (g_str_has_suffix(unit_path, "target")){
+            interface = "org.freedesktop.systemd1.Target";
+        }else if (g_str_has_suffix(unit_path, "socket")){
+            interface = "org.freedesktop.systemd1.Socket";
+        }else if (g_str_has_suffix(unit_path, "mount")){
+            interface = "org.freedesktop.systemd1.Mount";
+        }else if (g_str_has_suffix(unit_path, "swap")){
+            interface = "org.freedesktop.systemd1.Swap";
+        }else{
+            interface = "org.freedesktop.systemd1.Service";
+        }
+        
+        return interface;
+}
+

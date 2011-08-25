@@ -20,11 +20,6 @@
 
 /* Function to extract the status of an application after starting it or that is already running in the system */
 extern int AlGetAppState(DBusConnection * bus, char *app_name, char *state_info);
-/* Function responsible to broadcast the state of an application that 
- * started execution or an application already running in the system  */
-extern void AlAppStateNotifier(DBusConnection * bus, char *app_name);
-/* Function responsible to issue a notification after a task chnages state (fg/bg) */
-void AlChangeTaskStateNotifier(DBusConnection *p_conn, char *p_app_name, char *p_app_state);
 /* Connect to the DBUS bus and send a broadcast signal regarding application state */
 extern void AlSendAppSignal(DBusConnection * bus, char *name);
 

@@ -42,4 +42,9 @@ extern char *ExtractUnitNameTemplate(char *unit_name);
 /* Function responsible for getting unit object path
  * NOTE: result should be freed with free() 
  */
-char *GetUnitObjectPath(DBusConnection *p_conn, char *p_app_name);
+extern char *GetUnitObjectPath(DBusConnection *p_conn, char *p_app_name);
+/* Function responsible to extract the service interface from the path.
+ * Useful when determining which properties are available for the 
+ * specific service of interest.
+ */
+extern gchar * GetInterfaceFromPath (gchar * unitPath);
