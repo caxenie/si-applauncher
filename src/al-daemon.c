@@ -148,11 +148,9 @@ void AlListenToMethodCall()
   /* setup fg/bg application state */
   bool l_fg_state;
   /* application object path in state property setup */
-  const char *l_path;
+  char *l_path;
   /* iterator used for variant DBus type that stores the state property value */
   DBusMessageIter l_iter, l_variant; 
-  /* string to save the ful unit name when fetching path for properties */
-  char *l_app_string = malloc(DIM_MAX*sizeof(l_app_string));
   /* load unit message for systemd */
   DBusMessage *l_load_msg, *l_load_reply;
   log_message
@@ -853,82 +851,19 @@ void AlListenToMethodCall()
       if(AppPidFromName(l_app)!=0){
 	log_debug_message("AL Daemon Method Call Listener ChangeTaskState : Setting the state property for %s !\n ", l_app);
       
-    /* get unit object path */ 
-  if (!(l_msg_state = dbus_message_new_method_call("org.freedesktop.systemd1",
-					     	   "/org/freedesktop/systemd1",
-					     	   "org.freedesktop.systemd1.Manager",
-					     	   "GetUnit"))) {
-    log_error_message
-	("AL Daemon ChangeTaskState  : Could not allocate message for %s\n",
-	 l_app);
-    if (l_msg_state)
-    	dbus_message_unref(l_msg_state);
-     /* free the error */
-    dbus_error_free(&l_err);
-   continue;
-  }
   /* form the proper unit name to fetch object path */
   strcat(l_app,".service");
-  strcpy(l_app_string, l_app);
-  /* append application name as argument to method call */
-  if (!dbus_message_append_args(l_msg_state,
-				DBUS_TYPE_STRING, &l_app_string,
-				DBUS_TYPE_INVALID)) {
-        log_error_message
-	("AL Daemon ChangeTaskState  : Could not append arguments to message for %s\n",
-	 l_app);
-    if (l_msg_state)
-    	dbus_message_unref(l_msg_state);
-     /* free the error */
-     dbus_error_free(&l_err);
-   continue;
+  /* get unit object path */ 
+  if (NULL == (l_path = GetUnitObjectPath(l_conn, l_app)))
+  {
+          log_error_message
+                  ("AL Daemon ChangeTaskState : Unable to extract object path for %s", l_app);
+          continue;
   }
   log_debug_message
-	("AL Daemon ChangeTaskState  : Appended message args to fetch object path for %s\n",
-	 l_app);
-  /* send the message on the bus and wait for a reply */
-  if (!(l_reply_state =
-	dbus_connection_send_with_reply_and_block(l_conn, l_msg_state, -1,
-						  &l_err))) {
-    log_error_message
-	("AL Daemon ChangeTaskState  : Unknown information for %s \n",
-	 l_app);
-    log_error_message
-	("AL Daemon ChangeTaskState  : Error [%s: %s]\n",
-	 l_err.name, l_err.message);
-    if (l_msg_state)
-    	dbus_message_unref(l_msg_state);
-    if (l_reply_state)
-    	dbus_message_unref(l_reply_state);
-    /* free the error */
-    dbus_error_free(&l_err);
-   continue;
-  }
-  log_debug_message
-	("AL Daemon ChangeTaskState  : Object path fetch message sent and block for reply for %s\n",
-	 l_app);
+          ("AL Daemon ChangeTaskState  : Extracted object path for %s\n",
+           l_app);
 
-  /* extract arguments from the reply; the object path is useful for property fetch */
-  if (!dbus_message_get_args(l_reply_state, &l_err,
-			     DBUS_TYPE_OBJECT_PATH, &l_path,
-			     DBUS_TYPE_INVALID)) {
-    log_error_message
-	("AL Daemon ChangeTaskState  : Failed to parse reply for %s\n",
-	 l_app);
-    if (l_msg_state)
-    	dbus_message_unref(l_msg_state);
-    if (l_reply_state)
-    	dbus_message_unref(l_reply_state);
-     /* free the error */
-     dbus_error_free(&l_err);
-   continue;
-  }
-  log_debug_message
-	("AL Daemon ChangeTaskState  : Extracted object path for %s\n",
-	 l_app);
-  /* unreference the message */
-  dbus_message_unref(l_msg_state);
-  
   /* send state (fg/bg) property setup method call to systemd */
   if (!(l_msg_state =
        dbus_message_new_method_call("org.freedesktop.systemd1",  
@@ -1037,6 +972,8 @@ void AlListenToMethodCall()
 
    log_debug_message("AL Daemon Method Call Listener ChangeTaskState : State change notification was sent for %s !\n ", l_app);			
     ChangeTaskState(l_pid, l_fg_state);       
+    if (NULL != l_path)
+            free(l_path);
     }
  }
 

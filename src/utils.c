@@ -522,6 +522,84 @@ void SetupUnitFileKey(char *p_file, char *p_key, char *p_val, char *p_unit)
   }
 }
 
+/**
+ * Function responsible for getting unit object path
+ * NOTE: result must be freed using free() 
+ * */
+char *GetUnitObjectPath(DBusConnection *p_conn, char *p_unit_name)
+{
+  /* initialize message and reply */
+  DBusMessage *l_msg = NULL, *l_reply = NULL;
+  /* error definition*/
+  DBusError l_error;
+  /* initialize the path */
+  const char *l_path = NULL;
+
+  /* error initialization */
+  dbus_error_init(&l_error);
+
+  /* new method call to get unit information */
+  if (NULL == (l_msg = dbus_message_new_method_call("org.freedesktop.systemd1",
+                                                    "/org/freedesktop/systemd1",
+                                                    "org.freedesktop.systemd1.Manager",
+                                                    "GetUnit"))) 
+  {
+    log_error_message
+            ("AL Daemon Get Unit Object Path : Could not allocate message for %s\n", p_unit_name);
+    goto free_res;
+  }
+
+  /* append application name as argument to method call */
+  if (FALSE == dbus_message_append_args(l_msg,
+                                        DBUS_TYPE_STRING, &p_unit_name,
+                                        DBUS_TYPE_INVALID))
+  {
+    log_error_message
+            ("AL Daemon Get Unit Object Path : Could not append arguments to message for %s\n", p_unit_name);
+    goto free_res;
+  }
+
+  /* send the message on the bus and wait for a reply */
+  if (NULL == (l_reply = dbus_connection_send_with_reply_and_block(p_conn, l_msg, -1, &l_error))) 
+  {
+    log_error_message
+            ("AL Daemon Get Unit Object Path : Unknown information for %s \n", p_unit_name);
+    if (dbus_error_is_set(&l_error))
+    {
+      log_error_message
+              ("AL Daemon Get Unit Object Path : Error [%s: %s]\n", l_error.name, l_error.message);
+    }
+    goto free_res;
+  }
+
+  /* extract arguments from the reply; the object path is useful for property fetch */
+  if (FALSE == dbus_message_get_args(l_reply, &l_error,
+                                     DBUS_TYPE_OBJECT_PATH, &l_path,
+                                     DBUS_TYPE_INVALID)) 
+  {
+    log_error_message
+            ("AL Daemon Get Unit Object Path : Failed to parse reply for %s\n", p_unit_name);
+    if (dbus_error_is_set(&l_error))
+    {
+      log_error_message
+              ("AL Daemon Get Unit Object Path : Error [%s: %s]\n", l_error.name, l_error.message);
+    }
+    goto free_res;
+  }
+
+  dbus_message_unref(l_msg);
+  dbus_message_unref(l_reply);
+  return strdup(l_path);
+
+free_res:
+  if (l_msg)
+    dbus_message_unref(l_msg);
+  if (l_reply)
+    dbus_message_unref(l_reply);
+  dbus_error_free(&l_error);
+  return NULL;
+}
+
 /* 
  * Function responsible to setup the (fg/bg) state when starting the application
  * for the first time using Run or RunAs */
@@ -542,78 +620,16 @@ int SetupApplicationStartupState(DBusConnection *p_conn, char *p_app, bool l_fg_
   /* error initialization */
   dbus_error_init(&l_err);
   /* get unit object path */ 
-  if (!(l_msg_state = dbus_message_new_method_call("org.freedesktop.systemd1",
-					     	   "/org/freedesktop/systemd1",
-					     	   "org.freedesktop.systemd1.Manager",
-					     	   "GetUnit"))) {
-    log_error_message
-	("AL Daemon Setup Application Startup State  : Could not allocate message for %s\n",
-	 p_app);
-    if (l_msg_state)
-    	dbus_message_unref(l_msg_state);
-     /* free the error */
-    dbus_error_free(&l_err);
-   return -1;
-  }
-  /* append application name as argument to method call */
-  if (!dbus_message_append_args(l_msg_state,
-				DBUS_TYPE_STRING, &l_unit,
-				DBUS_TYPE_INVALID)) {
-        log_error_message
-	("AL Daemon Setup Application Startup State  : Could not append arguments to message for %s\n",
-	 l_unit);
-    if (l_msg_state)
-    	dbus_message_unref(l_msg_state);
-     /* free the error */
-     dbus_error_free(&l_err);
-   return -1;
+  if (NULL == (l_path = GetUnitObjectPath(p_conn, l_unit)))
+  {
+          log_error_message
+                  ("AL Daemon Setup Application Startup State : Unable to extract object path for %s", l_unit);
+          return -1;
   }
   log_debug_message
-	("AL Daemon Setup Application Startup State  : Appended message args to fetch object path for %s\n",
-	 p_app);
-  /* send the message on the bus and wait for a reply */
-  if (!(l_reply_state =
-	dbus_connection_send_with_reply_and_block(p_conn, l_msg_state, -1,
-						  &l_err))) {
-    log_error_message
-	("AL Daemon Setup Application Startup State  : Unknown information for %s \n",
-	 l_unit);
-    log_error_message
-	("AL Daemon Setup Application Startup State  : Error [%s : %s]\n",
-	 l_err.name, l_err.message);
-    if (l_msg_state)
-    	dbus_message_unref(l_msg_state);
-    if (l_reply_state)
-    	dbus_message_unref(l_reply_state);
-    /* free the error */
-    dbus_error_free(&l_err);
-   return -1;
-  }
-  log_debug_message
-	("AL Daemon Setup Application Startup State  : Object path fetch message sent and block for reply for %s\n",
-	 l_unit);
+          ("AL Daemon Setup Application Startup State : Extracted object path for %s\n",
+           l_unit);
 
-  /* extract arguments from the reply; the object path is useful for property fetch */
-  if (!dbus_message_get_args(l_reply_state, &l_err,
-			     DBUS_TYPE_OBJECT_PATH, &l_path,
-			     DBUS_TYPE_INVALID)) {
-    log_error_message
-	("AL Daemon Setup Application Startup State  : Failed to parse reply for %s\n",
-	 l_unit);
-    if (l_msg_state)
-    	dbus_message_unref(l_msg_state);
-    if (l_reply_state)
-    	dbus_message_unref(l_reply_state);
-     /* free the error */
-     dbus_error_free(&l_err);
-   return -1;
-  }
-  log_debug_message
-	("AL Daemon Setup Application Startup State  : Extracted object path for %s\n",
-	 l_unit);
-  /* unreference the message */
-  dbus_message_unref(l_msg_state);
-  
   /* send state (fg/bg) property setup method call to systemd */
   if (!(l_msg_state =
        dbus_message_new_method_call("org.freedesktop.systemd1",  
@@ -709,6 +725,8 @@ int SetupApplicationStartupState(DBusConnection *p_conn, char *p_app, bool l_fg_
     return -1;
    }
    log_debug_message("AL Daemon Method Call Listener Setup Application Startup State : Reply after setting state for %s was received!\n ", l_unit);
+   if (NULL != l_path)
+           free(l_path);
   return 0;
 }
 
