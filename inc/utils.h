@@ -48,3 +48,4 @@ extern char *GetUnitObjectPath(DBusConnection *p_conn, char *p_app_name);
  * specific service of interest.
  */
 extern gchar * GetInterfaceFromPath (gchar * unitPath);
+

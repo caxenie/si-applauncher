@@ -53,33 +53,31 @@ G_BEGIN_DECLS
 #endif /* !G_ENABLE_DEBUG */
 
 
-/* BOOLEAN:UINT,INT,INT,POINTER */
-extern void dbus_glib_marshal_al_dbus_BOOLEAN__UINT_INT_INT_POINTER (GClosure     *closure,
-                                                                     GValue       *return_value,
-                                                                     guint         n_param_values,
-                                                                     const GValue *param_values,
-                                                                     gpointer      invocation_hint,
-                                                                     gpointer      marshal_data);
+/* NONE:STRING,INT,BOOLEAN,POINTER */
+extern void dbus_glib_marshal_al_dbus_VOID__STRING_INT_BOOLEAN_POINTER (GClosure     *closure,
+                                                                        GValue       *return_value,
+                                                                        guint         n_param_values,
+                                                                        const GValue *param_values,
+                                                                        gpointer      invocation_hint,
+                                                                        gpointer      marshal_data);
 void
-dbus_glib_marshal_al_dbus_BOOLEAN__UINT_INT_INT_POINTER (GClosure     *closure,
-                                                         GValue       *return_value G_GNUC_UNUSED,
-                                                         guint         n_param_values,
-                                                         const GValue *param_values,
-                                                         gpointer      invocation_hint G_GNUC_UNUSED,
-                                                         gpointer      marshal_data)
+dbus_glib_marshal_al_dbus_VOID__STRING_INT_BOOLEAN_POINTER (GClosure     *closure,
+                                                            GValue       *return_value G_GNUC_UNUSED,
+                                                            guint         n_param_values,
+                                                            const GValue *param_values,
+                                                            gpointer      invocation_hint G_GNUC_UNUSED,
+                                                            gpointer      marshal_data)
 {
-  typedef gboolean (*GMarshalFunc_BOOLEAN__UINT_INT_INT_POINTER) (gpointer     data1,
-                                                                  guint        arg_1,
-                                                                  gint         arg_2,
-                                                                  gint         arg_3,
-                                                                  gpointer     arg_4,
-                                                                  gpointer     data2);
-  register GMarshalFunc_BOOLEAN__UINT_INT_INT_POINTER callback;
+  typedef void (*GMarshalFunc_VOID__STRING_INT_BOOLEAN_POINTER) (gpointer     data1,
+                                                                 gpointer     arg_1,
+                                                                 gint         arg_2,
+                                                                 gboolean     arg_3,
+                                                                 gpointer     arg_4,
+                                                                 gpointer     data2);
+  register GMarshalFunc_VOID__STRING_INT_BOOLEAN_POINTER callback;
   register GCClosure *cc = (GCClosure*) closure;
   register gpointer data1, data2;
-  gboolean v_return;
 
-  g_return_if_fail (return_value != NULL);
   g_return_if_fail (n_param_values == 5);
 
   if (G_CCLOSURE_SWAP_DATA (closure))
@@ -92,48 +90,41 @@ dbus_glib_marshal_al_dbus_BOOLEAN__UINT_INT_INT_POINTER (GClosure     *closure,
       data1 = g_value_peek_pointer (param_values + 0);
       data2 = closure->data;
     }
-  callback = (GMarshalFunc_BOOLEAN__UINT_INT_INT_POINTER) (marshal_data ? marshal_data : cc->callback);
+  callback = (GMarshalFunc_VOID__STRING_INT_BOOLEAN_POINTER) (marshal_data ? marshal_data : cc->callback);
 
-  v_return = callback (data1,
-                       g_marshal_value_peek_uint (param_values + 1),
-                       g_marshal_value_peek_int (param_values + 2),
-                       g_marshal_value_peek_int (param_values + 3),
-                       g_marshal_value_peek_pointer (param_values + 4),
-                       data2);
-
-  g_value_set_boolean (return_value, v_return);
+  callback (data1,
+            g_marshal_value_peek_string (param_values + 1),
+            g_marshal_value_peek_int (param_values + 2),
+            g_marshal_value_peek_boolean (param_values + 3),
+            g_marshal_value_peek_pointer (param_values + 4),
+            data2);
 }
+#define dbus_glib_marshal_al_dbus_NONE__STRING_INT_BOOLEAN_POINTER	dbus_glib_marshal_al_dbus_VOID__STRING_INT_BOOLEAN_POINTER
 
-/* BOOLEAN:STRING,BOOLEAN,INT,INT,POINTER,POINTER */
-extern void dbus_glib_marshal_al_dbus_BOOLEAN__STRING_BOOLEAN_INT_INT_POINTER_POINTER (GClosure     *closure,
-                                                                                       GValue       *return_value,
-                                                                                       guint         n_param_values,
-                                                                                       const GValue *param_values,
-                                                                                       gpointer      invocation_hint,
-                                                                                       gpointer      marshal_data);
+/* NONE:INT,POINTER */
+extern void dbus_glib_marshal_al_dbus_VOID__INT_POINTER (GClosure     *closure,
+                                                         GValue       *return_value,
+                                                         guint         n_param_values,
+                                                         const GValue *param_values,
+                                                         gpointer      invocation_hint,
+                                                         gpointer      marshal_data);
 void
-dbus_glib_marshal_al_dbus_BOOLEAN__STRING_BOOLEAN_INT_INT_POINTER_POINTER (GClosure     *closure,
-                                                                           GValue       *return_value G_GNUC_UNUSED,
-                                                                           guint         n_param_values,
-                                                                           const GValue *param_values,
-                                                                           gpointer      invocation_hint G_GNUC_UNUSED,
-                                                                           gpointer      marshal_data)
+dbus_glib_marshal_al_dbus_VOID__INT_POINTER (GClosure     *closure,
+                                             GValue       *return_value G_GNUC_UNUSED,
+                                             guint         n_param_values,
+                                             const GValue *param_values,
+                                             gpointer      invocation_hint G_GNUC_UNUSED,
+                                             gpointer      marshal_data)
 {
-  typedef gboolean (*GMarshalFunc_BOOLEAN__STRING_BOOLEAN_INT_INT_POINTER_POINTER) (gpointer     data1,
-                                                                                    gpointer     arg_1,
-                                                                                    gboolean     arg_2,
-                                                                                    gint         arg_3,
-                                                                                    gint         arg_4,
-                                                                                    gpointer     arg_5,
-                                                                                    gpointer     arg_6,
-                                                                                    gpointer     data2);
-  register GMarshalFunc_BOOLEAN__STRING_BOOLEAN_INT_INT_POINTER_POINTER callback;
+  typedef void (*GMarshalFunc_VOID__INT_POINTER) (gpointer     data1,
+                                                  gint         arg_1,
+                                                  gpointer     arg_2,
+                                                  gpointer     data2);
+  register GMarshalFunc_VOID__INT_POINTER callback;
   register GCClosure *cc = (GCClosure*) closure;
   register gpointer data1, data2;
-  gboolean v_return;
 
-  g_return_if_fail (return_value != NULL);
-  g_return_if_fail (n_param_values == 7);
+  g_return_if_fail (n_param_values == 3);
 
   if (G_CCLOSURE_SWAP_DATA (closure))
     {
@@ -145,46 +136,39 @@ dbus_glib_marshal_al_dbus_BOOLEAN__STRING_BOOLEAN_INT_INT_POINTER_POINTER (GClos
       data1 = g_value_peek_pointer (param_values + 0);
       data2 = closure->data;
     }
-  callback = (GMarshalFunc_BOOLEAN__STRING_BOOLEAN_INT_INT_POINTER_POINTER) (marshal_data ? marshal_data : cc->callback);
+  callback = (GMarshalFunc_VOID__INT_POINTER) (marshal_data ? marshal_data : cc->callback);
 
-  v_return = callback (data1,
-                       g_marshal_value_peek_string (param_values + 1),
-                       g_marshal_value_peek_boolean (param_values + 2),
-                       g_marshal_value_peek_int (param_values + 3),
-                       g_marshal_value_peek_int (param_values + 4),
-                       g_marshal_value_peek_pointer (param_values + 5),
-                       g_marshal_value_peek_pointer (param_values + 6),
-                       data2);
-
-  g_value_set_boolean (return_value, v_return);
+  callback (data1,
+            g_marshal_value_peek_int (param_values + 1),
+            g_marshal_value_peek_pointer (param_values + 2),
+            data2);
 }
+#define dbus_glib_marshal_al_dbus_NONE__INT_POINTER	dbus_glib_marshal_al_dbus_VOID__INT_POINTER
 
-/* BOOLEAN:INT,BOOLEAN,POINTER */
-extern void dbus_glib_marshal_al_dbus_BOOLEAN__INT_BOOLEAN_POINTER (GClosure     *closure,
-                                                                    GValue       *return_value,
-                                                                    guint         n_param_values,
-                                                                    const GValue *param_values,
-                                                                    gpointer      invocation_hint,
-                                                                    gpointer      marshal_data);
+/* NONE:INT,BOOLEAN,POINTER */
+extern void dbus_glib_marshal_al_dbus_VOID__INT_BOOLEAN_POINTER (GClosure     *closure,
+                                                                 GValue       *return_value,
+                                                                 guint         n_param_values,
+                                                                 const GValue *param_values,
+                                                                 gpointer      invocation_hint,
+                                                                 gpointer      marshal_data);
 void
-dbus_glib_marshal_al_dbus_BOOLEAN__INT_BOOLEAN_POINTER (GClosure     *closure,
-                                                        GValue       *return_value G_GNUC_UNUSED,
-                                                        guint         n_param_values,
-                                                        const GValue *param_values,
-                                                        gpointer      invocation_hint G_GNUC_UNUSED,
-                                                        gpointer      marshal_data)
+dbus_glib_marshal_al_dbus_VOID__INT_BOOLEAN_POINTER (GClosure     *closure,
+                                                     GValue       *return_value G_GNUC_UNUSED,
+                                                     guint         n_param_values,
+                                                     const GValue *param_values,
+                                                     gpointer      invocation_hint G_GNUC_UNUSED,
+                                                     gpointer      marshal_data)
 {
-  typedef gboolean (*GMarshalFunc_BOOLEAN__INT_BOOLEAN_POINTER) (gpointer     data1,
-                                                                 gint         arg_1,
-                                                                 gboolean     arg_2,
-                                                                 gpointer     arg_3,
-                                                                 gpointer     data2);
-  register GMarshalFunc_BOOLEAN__INT_BOOLEAN_POINTER callback;
+  typedef void (*GMarshalFunc_VOID__INT_BOOLEAN_POINTER) (gpointer     data1,
+                                                          gint         arg_1,
+                                                          gboolean     arg_2,
+                                                          gpointer     arg_3,
+                                                          gpointer     data2);
+  register GMarshalFunc_VOID__INT_BOOLEAN_POINTER callback;
   register GCClosure *cc = (GCClosure*) closure;
   register gpointer data1, data2;
-  gboolean v_return;
 
-  g_return_if_fail (return_value != NULL);
   g_return_if_fail (n_param_values == 4);
 
   if (G_CCLOSURE_SWAP_DATA (closure))
@@ -197,43 +181,44 @@ dbus_glib_marshal_al_dbus_BOOLEAN__INT_BOOLEAN_POINTER (GClosure     *closure,
       data1 = g_value_peek_pointer (param_values + 0);
       data2 = closure->data;
     }
-  callback = (GMarshalFunc_BOOLEAN__INT_BOOLEAN_POINTER) (marshal_data ? marshal_data : cc->callback);
+  callback = (GMarshalFunc_VOID__INT_BOOLEAN_POINTER) (marshal_data ? marshal_data : cc->callback);
 
-  v_return = callback (data1,
-                       g_marshal_value_peek_int (param_values + 1),
-                       g_marshal_value_peek_boolean (param_values + 2),
-                       g_marshal_value_peek_pointer (param_values + 3),
-                       data2);
-
-  g_value_set_boolean (return_value, v_return);
+  callback (data1,
+            g_marshal_value_peek_int (param_values + 1),
+            g_marshal_value_peek_boolean (param_values + 2),
+            g_marshal_value_peek_pointer (param_values + 3),
+            data2);
 }
+#define dbus_glib_marshal_al_dbus_NONE__INT_BOOLEAN_POINTER	dbus_glib_marshal_al_dbus_VOID__INT_BOOLEAN_POINTER
 
-/* BOOLEAN:UINT,POINTER */
-extern void dbus_glib_marshal_al_dbus_BOOLEAN__UINT_POINTER (GClosure     *closure,
-                                                             GValue       *return_value,
-                                                             guint         n_param_values,
-                                                             const GValue *param_values,
-                                                             gpointer      invocation_hint,
-                                                             gpointer      marshal_data);
+/* NONE:STRING,INT,BOOLEAN,INT,INT,POINTER */
+extern void dbus_glib_marshal_al_dbus_VOID__STRING_INT_BOOLEAN_INT_INT_POINTER (GClosure     *closure,
+                                                                                GValue       *return_value,
+                                                                                guint         n_param_values,
+                                                                                const GValue *param_values,
+                                                                                gpointer      invocation_hint,
+                                                                                gpointer      marshal_data);
 void
-dbus_glib_marshal_al_dbus_BOOLEAN__UINT_POINTER (GClosure     *closure,
-                                                 GValue       *return_value G_GNUC_UNUSED,
-                                                 guint         n_param_values,
-                                                 const GValue *param_values,
-                                                 gpointer      invocation_hint G_GNUC_UNUSED,
-                                                 gpointer      marshal_data)
+dbus_glib_marshal_al_dbus_VOID__STRING_INT_BOOLEAN_INT_INT_POINTER (GClosure     *closure,
+                                                                    GValue       *return_value G_GNUC_UNUSED,
+                                                                    guint         n_param_values,
+                                                                    const GValue *param_values,
+                                                                    gpointer      invocation_hint G_GNUC_UNUSED,
+                                                                    gpointer      marshal_data)
 {
-  typedef gboolean (*GMarshalFunc_BOOLEAN__UINT_POINTER) (gpointer     data1,
-                                                          guint        arg_1,
-                                                          gpointer     arg_2,
-                                                          gpointer     data2);
-  register GMarshalFunc_BOOLEAN__UINT_POINTER callback;
+  typedef void (*GMarshalFunc_VOID__STRING_INT_BOOLEAN_INT_INT_POINTER) (gpointer     data1,
+                                                                         gpointer     arg_1,
+                                                                         gint         arg_2,
+                                                                         gboolean     arg_3,
+                                                                         gint         arg_4,
+                                                                         gint         arg_5,
+                                                                         gpointer     arg_6,
+                                                                         gpointer     data2);
+  register GMarshalFunc_VOID__STRING_INT_BOOLEAN_INT_INT_POINTER callback;
   register GCClosure *cc = (GCClosure*) closure;
   register gpointer data1, data2;
-  gboolean v_return;
 
-  g_return_if_fail (return_value != NULL);
-  g_return_if_fail (n_param_values == 3);
+  g_return_if_fail (n_param_values == 7);
 
   if (G_CCLOSURE_SWAP_DATA (closure))
     {
@@ -245,43 +230,44 @@ dbus_glib_marshal_al_dbus_BOOLEAN__UINT_POINTER (GClosure     *closure,
       data1 = g_value_peek_pointer (param_values + 0);
       data2 = closure->data;
     }
-  callback = (GMarshalFunc_BOOLEAN__UINT_POINTER) (marshal_data ? marshal_data : cc->callback);
+  callback = (GMarshalFunc_VOID__STRING_INT_BOOLEAN_INT_INT_POINTER) (marshal_data ? marshal_data : cc->callback);
 
-  v_return = callback (data1,
-                       g_marshal_value_peek_uint (param_values + 1),
-                       g_marshal_value_peek_pointer (param_values + 2),
-                       data2);
-
-  g_value_set_boolean (return_value, v_return);
+  callback (data1,
+            g_marshal_value_peek_string (param_values + 1),
+            g_marshal_value_peek_int (param_values + 2),
+            g_marshal_value_peek_boolean (param_values + 3),
+            g_marshal_value_peek_int (param_values + 4),
+            g_marshal_value_peek_int (param_values + 5),
+            g_marshal_value_peek_pointer (param_values + 6),
+            data2);
 }
+#define dbus_glib_marshal_al_dbus_NONE__STRING_INT_BOOLEAN_INT_INT_POINTER	dbus_glib_marshal_al_dbus_VOID__STRING_INT_BOOLEAN_INT_INT_POINTER
 
-/* BOOLEAN:STRING,BOOLEAN,POINTER,POINTER */
-extern void dbus_glib_marshal_al_dbus_BOOLEAN__STRING_BOOLEAN_POINTER_POINTER (GClosure     *closure,
-                                                                               GValue       *return_value,
-                                                                               guint         n_param_values,
-                                                                               const GValue *param_values,
-                                                                               gpointer      invocation_hint,
-                                                                               gpointer      marshal_data);
+/* NONE:INT,INT,INT,POINTER */
+extern void dbus_glib_marshal_al_dbus_VOID__INT_INT_INT_POINTER (GClosure     *closure,
+                                                                 GValue       *return_value,
+                                                                 guint         n_param_values,
+                                                                 const GValue *param_values,
+                                                                 gpointer      invocation_hint,
+                                                                 gpointer      marshal_data);
 void
-dbus_glib_marshal_al_dbus_BOOLEAN__STRING_BOOLEAN_POINTER_POINTER (GClosure     *closure,
-                                                                   GValue       *return_value G_GNUC_UNUSED,
-                                                                   guint         n_param_values,
-                                                                   const GValue *param_values,
-                                                                   gpointer      invocation_hint G_GNUC_UNUSED,
-                                                                   gpointer      marshal_data)
+dbus_glib_marshal_al_dbus_VOID__INT_INT_INT_POINTER (GClosure     *closure,
+                                                     GValue       *return_value G_GNUC_UNUSED,
+                                                     guint         n_param_values,
+                                                     const GValue *param_values,
+                                                     gpointer      invocation_hint G_GNUC_UNUSED,
+                                                     gpointer      marshal_data)
 {
-  typedef gboolean (*GMarshalFunc_BOOLEAN__STRING_BOOLEAN_POINTER_POINTER) (gpointer     data1,
-                                                                            gpointer     arg_1,
-                                                                            gboolean     arg_2,
-                                                                            gpointer     arg_3,
-                                                                            gpointer     arg_4,
-                                                                            gpointer     data2);
-  register GMarshalFunc_BOOLEAN__STRING_BOOLEAN_POINTER_POINTER callback;
+  typedef void (*GMarshalFunc_VOID__INT_INT_INT_POINTER) (gpointer     data1,
+                                                          gint         arg_1,
+                                                          gint         arg_2,
+                                                          gint         arg_3,
+                                                          gpointer     arg_4,
+                                                          gpointer     data2);
+  register GMarshalFunc_VOID__INT_INT_INT_POINTER callback;
   register GCClosure *cc = (GCClosure*) closure;
   register gpointer data1, data2;
-  gboolean v_return;
 
-  g_return_if_fail (return_value != NULL);
   g_return_if_fail (n_param_values == 5);
 
   if (G_CCLOSURE_SWAP_DATA (closure))
@@ -294,43 +280,40 @@ dbus_glib_marshal_al_dbus_BOOLEAN__STRING_BOOLEAN_POINTER_POINTER (GClosure     
       data1 = g_value_peek_pointer (param_values + 0);
       data2 = closure->data;
     }
-  callback = (GMarshalFunc_BOOLEAN__STRING_BOOLEAN_POINTER_POINTER) (marshal_data ? marshal_data : cc->callback);
+  callback = (GMarshalFunc_VOID__INT_INT_INT_POINTER) (marshal_data ? marshal_data : cc->callback);
 
-  v_return = callback (data1,
-                       g_marshal_value_peek_string (param_values + 1),
-                       g_marshal_value_peek_boolean (param_values + 2),
-                       g_marshal_value_peek_pointer (param_values + 3),
-                       g_marshal_value_peek_pointer (param_values + 4),
-                       data2);
-
-  g_value_set_boolean (return_value, v_return);
+  callback (data1,
+            g_marshal_value_peek_int (param_values + 1),
+            g_marshal_value_peek_int (param_values + 2),
+            g_marshal_value_peek_int (param_values + 3),
+            g_marshal_value_peek_pointer (param_values + 4),
+            data2);
 }
+#define dbus_glib_marshal_al_dbus_NONE__INT_INT_INT_POINTER	dbus_glib_marshal_al_dbus_VOID__INT_INT_INT_POINTER
 
-/* BOOLEAN:STRING,POINTER */
-extern void dbus_glib_marshal_al_dbus_BOOLEAN__STRING_POINTER (GClosure     *closure,
-                                                               GValue       *return_value,
-                                                               guint         n_param_values,
-                                                               const GValue *param_values,
-                                                               gpointer      invocation_hint,
-                                                               gpointer      marshal_data);
+/* NONE:STRING,POINTER */
+extern void dbus_glib_marshal_al_dbus_VOID__STRING_POINTER (GClosure     *closure,
+                                                            GValue       *return_value,
+                                                            guint         n_param_values,
+                                                            const GValue *param_values,
+                                                            gpointer      invocation_hint,
+                                                            gpointer      marshal_data);
 void
-dbus_glib_marshal_al_dbus_BOOLEAN__STRING_POINTER (GClosure     *closure,
-                                                   GValue       *return_value G_GNUC_UNUSED,
-                                                   guint         n_param_values,
-                                                   const GValue *param_values,
-                                                   gpointer      invocation_hint G_GNUC_UNUSED,
-                                                   gpointer      marshal_data)
+dbus_glib_marshal_al_dbus_VOID__STRING_POINTER (GClosure     *closure,
+                                                GValue       *return_value G_GNUC_UNUSED,
+                                                guint         n_param_values,
+                                                const GValue *param_values,
+                                                gpointer      invocation_hint G_GNUC_UNUSED,
+                                                gpointer      marshal_data)
 {
-  typedef gboolean (*GMarshalFunc_BOOLEAN__STRING_POINTER) (gpointer     data1,
-                                                            gpointer     arg_1,
-                                                            gpointer     arg_2,
-                                                            gpointer     data2);
-  register GMarshalFunc_BOOLEAN__STRING_POINTER callback;
+  typedef void (*GMarshalFunc_VOID__STRING_POINTER) (gpointer     data1,
+                                                     gpointer     arg_1,
+                                                     gpointer     arg_2,
+                                                     gpointer     data2);
+  register GMarshalFunc_VOID__STRING_POINTER callback;
   register GCClosure *cc = (GCClosure*) closure;
   register gpointer data1, data2;
-  gboolean v_return;
 
-  g_return_if_fail (return_value != NULL);
   g_return_if_fail (n_param_values == 3);
 
   if (G_CCLOSURE_SWAP_DATA (closure))
@@ -343,15 +326,14 @@ dbus_glib_marshal_al_dbus_BOOLEAN__STRING_POINTER (GClosure     *closure,
       data1 = g_value_peek_pointer (param_values + 0);
       data2 = closure->data;
     }
-  callback = (GMarshalFunc_BOOLEAN__STRING_POINTER) (marshal_data ? marshal_data : cc->callback);
+  callback = (GMarshalFunc_VOID__STRING_POINTER) (marshal_data ? marshal_data : cc->callback);
 
-  v_return = callback (data1,
-                       g_marshal_value_peek_string (param_values + 1),
-                       g_marshal_value_peek_pointer (param_values + 2),
-                       data2);
-
-  g_value_set_boolean (return_value, v_return);
+  callback (data1,
+            g_marshal_value_peek_string (param_values + 1),
+            g_marshal_value_peek_pointer (param_values + 2),
+            data2);
 }
+#define dbus_glib_marshal_al_dbus_NONE__STRING_POINTER	dbus_glib_marshal_al_dbus_VOID__STRING_POINTER
 
 G_END_DECLS
 
@@ -359,21 +341,21 @@ G_END_DECLS
 
 #include <dbus/dbus-glib.h>
 static const DBusGMethodInfo dbus_glib_al_dbus_methods[] = {
-  { (GCallback) al_dbus_run, dbus_glib_marshal_al_dbus_BOOLEAN__STRING_BOOLEAN_POINTER_POINTER, 0 },
-  { (GCallback) al_dbus_run_as, dbus_glib_marshal_al_dbus_BOOLEAN__STRING_BOOLEAN_INT_INT_POINTER_POINTER, 71 },
-  { (GCallback) al_dbus_stop, dbus_glib_marshal_al_dbus_BOOLEAN__UINT_POINTER, 168 },
-  { (GCallback) al_dbus_stop_as, dbus_glib_marshal_al_dbus_BOOLEAN__UINT_INT_INT_POINTER, 204 },
-  { (GCallback) al_dbus_resume, dbus_glib_marshal_al_dbus_BOOLEAN__UINT_POINTER, 266 },
-  { (GCallback) al_dbus_suspend, dbus_glib_marshal_al_dbus_BOOLEAN__UINT_POINTER, 304 },
-  { (GCallback) al_dbus_restart, dbus_glib_marshal_al_dbus_BOOLEAN__STRING_POINTER, 343 },
-  { (GCallback) al_dbus_change_task_state, dbus_glib_marshal_al_dbus_BOOLEAN__INT_BOOLEAN_POINTER, 383 },
+  { (GCallback) al_dbus_run, dbus_glib_marshal_al_dbus_NONE__STRING_INT_BOOLEAN_POINTER, 0 },
+  { (GCallback) al_dbus_run_as, dbus_glib_marshal_al_dbus_NONE__STRING_INT_BOOLEAN_INT_INT_POINTER, 86 },
+  { (GCallback) al_dbus_stop, dbus_glib_marshal_al_dbus_NONE__INT_POINTER, 198 },
+  { (GCallback) al_dbus_stop_as, dbus_glib_marshal_al_dbus_NONE__INT_INT_INT_POINTER, 234 },
+  { (GCallback) al_dbus_resume, dbus_glib_marshal_al_dbus_NONE__INT_POINTER, 296 },
+  { (GCallback) al_dbus_suspend, dbus_glib_marshal_al_dbus_NONE__INT_POINTER, 334 },
+  { (GCallback) al_dbus_restart, dbus_glib_marshal_al_dbus_NONE__STRING_POINTER, 373 },
+  { (GCallback) al_dbus_change_task_state, dbus_glib_marshal_al_dbus_NONE__INT_BOOLEAN_POINTER, 413 },
 };
 
 const DBusGObjectInfo dbus_glib_al_dbus_object_info = {
   0,
   dbus_glib_al_dbus_methods,
   8,
-"org.GENIVI.AppL\0Run\0S\0command_line\0I\0s\0foreground\0I\0b\0new_pid\0O\0F\0N\0i\0\0org.GENIVI.AppL\0RunAs\0S\0command_line\0I\0s\0foreground\0I\0b\0app_uid\0I\0i\0app_gid\0I\0i\0new_pid\0O\0F\0N\0i\0\0org.GENIVI.AppL\0Stop\0S\0app_pid\0I\0u\0\0org.GENIVI.AppL\0StopAs\0S\0app_pid\0I\0u\0app_uid\0I\0i\0app_gid\0I\0i\0\0org.GENIVI.AppL\0Resume\0S\0app_pid\0I\0u\0\0org.GENIVI.AppL\0Suspend\0S\0app_pid\0I\0u\0\0org.GENIVI.AppL\0Restart\0S\0app_name\0I\0s\0\0org.GENIVI.AppL\0ChangeTaskState\0S\0app_pid\0I\0i\0foreground\0I\0b\0\0\0",
+"org.GENIVI.AppL\0Run\0A\0command_line\0I\0s\0parent_pid\0I\0i\0foreground\0I\0b\0new_pid\0O\0F\0N\0i\0\0org.GENIVI.AppL\0RunAs\0A\0command_line\0I\0s\0parent_pid\0I\0i\0foreground\0I\0b\0app_uid\0I\0i\0app_gid\0I\0i\0new_pid\0O\0F\0N\0i\0\0org.GENIVI.AppL\0Stop\0A\0app_pid\0I\0i\0\0org.GENIVI.AppL\0StopAs\0A\0app_pid\0I\0i\0app_uid\0I\0i\0app_gid\0I\0i\0\0org.GENIVI.AppL\0Resume\0A\0app_pid\0I\0i\0\0org.GENIVI.AppL\0Suspend\0A\0app_pid\0I\0i\0\0org.GENIVI.AppL\0Restart\0A\0app_name\0I\0s\0\0org.GENIVI.AppL\0ChangeTaskState\0A\0app_pid\0I\0i\0foreground\0I\0b\0\0\0",
 "org.GENIVI.AppL\0GlobalStateNotification\0org.GENIVI.AppL\0TaskStarted\0org.GENIVI.AppL\0TaskStopped\0org.GENIVI.AppL\0ChangeTaskStateComplete\0\0",
 "\0"
 };

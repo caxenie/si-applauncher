@@ -19,8 +19,8 @@
 */
 
 /* High level interface for the AL Daemon */
-extern void Run(char *p_commandLine, int p_parentPID, bool p_isFg, int p_newPID);
-extern void RunAs(char *p_commandLine, int p_parentPID, bool p_isFg, int p_euid, int p_egid, int p_newPID);
+extern void Run(char *p_commandLine, int p_parentPID, bool p_isFg);
+extern void RunAs(char *p_commandLine, int p_parentPID, bool p_isFg, int p_euid, int p_egid);
 extern void Suspend(int pid);
 extern void Resume(int pid);
 extern void Stop(int pid);

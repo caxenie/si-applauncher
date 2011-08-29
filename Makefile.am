@@ -25,6 +25,24 @@ al_daemon_CFLAGS = \
 		$(GCONF_LIBS) \
 		$(GCONF_CFLAGS)
 
+DBUS_BINDING_TOOL = dbus-binding-tool
+DBUS_BINDING_MODE = glib-server
+
+AL_DBUS_GLUE_PREFIX = al_dbus
+AL_DBUS_GLUE_XML = src/al_dbus.xml
+AL_DBUS_GLUE_FILE = inc/al_dbus-glue.h
+
+all: bindings
+
+bindings: $(AL_DBUS_GLUE_XML)
+	$(DBUS_BINDING_TOOL) --mode=$(DBUS_BINDING_MODE) --prefix=$(AL_DBUS_GLUE_PREFIX) $(AL_DBUS_GLUE_XML) > $(AL_DBUS_GLUE_FILE)
+
+# custom marshallers
+# echo "VOID:STRING" | glib-genmarshal --body --prefix=$AL_DBUS_GLUE_PREFIX > global_notif_custom_marshaller.c
+# echo "VOID:INT,STRING" | glib-genmarshal --body --prefix=$AL_DBUS_GLUE_PREFIX > task_info_custom_marshaller.c
+# echo "VOID:STRING,STRING" | glib-genmarshal --body --prefix=$AL_DBUS_GLUE_PREFIX > task_state_change_custom_marshaller.c
+
+
 if BUILD_WITH_DEBUG
     al_daemon_CFLAGS += -DDEBUG 
 endif

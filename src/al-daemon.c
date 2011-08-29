@@ -123,24 +123,25 @@ void AlParseCLIOptions(int argc, char *const *argv)
     AlPrintCLI();
 }
 
+
 /* Signal handler for the daemon */
 void AlSignalHandler(int p_sig)
 
 {
     switch(p_sig) {
 	    case SIGTERM:
-		log_debug_message("AL Daemon : Application launcher received TERM signal ...\n", 0);
-		log_debug_message("AL Daemon : Application launcher daemon exiting ....\n", 0);
-		log_debug_message("AL Daemon : Removing lock file %s \n", AL_PID_FILE);
+		log_debug_message("Application launcher received TERM signal ...\n", 0);
+		log_debug_message("Application launcher daemon exiting ....\n", 0);
+		log_debug_message("Removing lock file %s \n", AL_PID_FILE);
 		remove(AL_PID_FILE);
-		log_message("AL Daemon : Daemon exited !\n", 0);
+		log_message("Daemon exited !\n", 0);
                 exit(EXIT_SUCCESS);
 		break;
 	    case SIGKILL:
-		log_debug_message("AL Daemon : Application launcher received KILL signal ...\n", 0);
+		log_debug_message("Application launcher received KILL signal ...\n", 0);
 		break;
  	    default:
-		log_debug_message("AL Daemon : Daemon received unhandled signal %s\n!", strsignal(p_sig));
+		log_debug_message("Daemon received unhandled signal %s\n!", strsignal(p_sig));
 		break;
         }
 }
@@ -174,16 +175,16 @@ int main(int argc, char **argv)
   if (g_start) {
     /* daemonize the application launcher */
     AlDaemonize();
-    log_message("AL Daemon : Daemon process was started !\n", 0);
+    log_message("Daemon process was started !\n", 0);
     /* initialise the last user mode */
     if(!(l_ret=InitializeLastUserMode())){
-      log_error_message("AL Daemon : Last user mode initialization failed !\n", 0);
+      log_error_message("Last user mode initialization failed !\n", 0);
     }
-    else { log_message("AL Daemon : Last user mode initialized. Listening for method calls ....\n", 0);
+    else { log_message("Last user mode initialized. Listening for method calls ....\n", 0);
     }
     /* initialize SRM Daemon */
 	if(!initialize_al_dbus()){
-		fprintf(stderr, "AL Daemon : Failed to initialize AL Daemon!\n Stopping daemon ...");
+		log_error_message("Failed to initialize AL Daemon!\n Stopping daemon ...", 0);
 		terminate_al_dbus();
 		return 1;
 
@@ -193,7 +194,7 @@ int main(int argc, char **argv)
 	/* main loop */
 	GMainLoop *l_loop = NULL;
 	if(!(l_loop = g_main_loop_new(NULL, FALSE))){
-		g_print("AL Daemon : Error creating main loop !");
+		log_error_message("Error creating main loop !\n", 0);
 		exit(1);
 	}
 
@@ -201,7 +202,7 @@ int main(int argc, char **argv)
 	g_main_loop_run(l_loop);
 
   }
-  log_message("AL Daemon : Daemon exited !\n", 0);
+  log_message("Daemon exited !\n", 0);
   /* close logging mechanism */
   closelog ();
 

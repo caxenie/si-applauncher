@@ -20,37 +20,45 @@
   <interface name="org.GENIVI.AppL">
 	<annotation name="org.freedesktop.DBus.GLib.CSymbol" value="al_dbus"/>
 	 <method name="Run"> 
+         <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
 		      <arg name="command_line" type="s" direction="in"/>
-                 <!-- <arg name="parent_pid" type="i" direction="out"/> -->
+                      <arg name="parent_pid" type="i" direction="in"/> 
 		      <arg name="foreground" type="b" direction="in"/>
 		      <arg name="new_pid" type="i" direction="out"/>
             </method>
             <method name="RunAs">
+	    <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
 		      <arg name="command_line" type="s" direction="in"/>
-                 <!-- <arg name="parent_pid" type="i" direction="out"/> -->
+                      <arg name="parent_pid" type="i" direction="in"/> 
 		      <arg name="foreground" type="b" direction="in"/>
 		      <arg name="app_uid" type="i" direction="in"/>
 		      <arg name="app_gid" type="i" direction="in"/>
 		      <arg name="new_pid" type="i" direction="out"/>
             </method>
             <method name="Stop">
-		      <arg name="app_pid" type="u" direction="in"/>
+	    <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+		      <arg name="app_pid" type="i" direction="in"/>
             </method>
             <method name="StopAs">
-		      <arg name="app_pid" type="u" direction="in"/>
+	    <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+		      <arg name="app_pid" type="i" direction="in"/>
 		      <arg name="app_uid" type="i" direction="in"/>
 		      <arg name="app_gid" type="i" direction="in"/>
             </method>
             <method name="Resume">
-		      <arg name="app_pid" type="u" direction="in"/>
+	    <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+		      <arg name="app_pid" type="i" direction="in"/>
             </method>
             <method name="Suspend">
-		      <arg name="app_pid" type="u" direction="in"/>
+	    <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+		      <arg name="app_pid" type="i" direction="in"/>
             </method>
             <method name="Restart">
+	    <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
 		      <arg name="app_name" type="s" direction="in"/>
             </method>
             <method name="ChangeTaskState">
+	    <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
 		      <arg name="app_pid" type="i" direction="in"/>
 		      <arg name="foreground" type="b" direction="in"/>
             </method>

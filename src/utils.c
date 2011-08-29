@@ -60,20 +60,20 @@ void AlDaemonize()
 
     /* test for forking errors */
     if (l_al_pid<0) {
-        log_error_message("AL Daemon : Cannot fork off parent process!\n", 0);
+        log_error_message("Cannot fork off parent process!\n", 0);
         exit(EXIT_FAILURE);
         }
 
     /* check parent exit */
     if (l_al_pid>0) {
-        log_debug_message("AL Daemon : Parent process exited!\n", 0);
+        log_debug_message("Parent process exited!\n", 0);
         exit(0);
     }
     /* child (daemon) continues */
     l_al_sid = setsid();
     /* obtain a new process group */
     if (l_al_sid < 0) {
-          log_error_message("AL Daemon : Cannot set SID for the process!\n", 0);
+          log_error_message("Cannot set SID for the process!\n", 0);
           exit(EXIT_FAILURE);
       }
 
@@ -84,13 +84,13 @@ void AlDaemonize()
 
     /* test if pid file can be open */
     if (l_fp<0) {
-        log_error_message("AL Daemon : Cannot open pid file\n", 0);
+        log_error_message("Cannot open pid file\n", 0);
         exit(1);
     }
 
     /* test if pid file can locked */
     if (lockf(l_fp, F_TLOCK,0)<0) {
-        log_error_message("AL Daemon : Cannot obtain lock on pid file\n", 0);
+        log_error_message("Cannot obtain lock on pid file\n", 0);
         exit(0);
 	}
 
@@ -106,7 +106,7 @@ void AlDaemonize()
 /* Function responsible to shutdown the daemon process */
 void AlDaemonShutdown(){
 	remove(AL_PID_FILE);
-	log_debug_message("AL Daemon : Daemon process was stopped !\n", 0);
+	log_debug_message("Daemon process was stopped !\n", 0);
 	system("killall al-daemon");
 }
 
@@ -126,7 +126,7 @@ pid_t AppPidFromName(char *p_app_name)
   /* error handler */
   if (!l_dir) {
     log_error_message
-	("AL Daemon Application Pid Extractor : Cannot open directory for %s\n!",
+	("Application Pid Extractor : Cannot open directory for %s\n!",
 	 p_app_name);
     return 0;
   }
@@ -311,11 +311,11 @@ GKeyFile *ParseUnitFile(char *p_file)
    /* test if unit is a timer or a normal service */
    if(strstr(p_file, ".timer")==NULL){
     log_error_message
-	("AL Daemon Unit File Parser : Cannot load key structure from service unit key file! (%d: %s)\n",
+	("Unit File Parser : Cannot load key structure from service unit key file! (%d: %s)\n",
 	 l_err->code, l_err->message);
     }else{
     log_error_message
-	("AL Daemon Unit File Parser : Cannot load key structure from timer unit key file! (%d: %s)\n",
+	("Unit File Parser : Cannot load key structure from timer unit key file! (%d: %s)\n",
 	 l_err->code, l_err->message);
     }
     g_error_free(l_err); 
@@ -327,11 +327,11 @@ GKeyFile *ParseUnitFile(char *p_file)
   if (l_groups == NULL) {
    if(strstr(p_file,".timer")==NULL){
     log_error_message
-	("AL Daemon Unit File Parser : Could not retrieve groups from %s service unit file!\n",
+	("Unit File Parser : Could not retrieve groups from %s service unit file!\n",
 	 p_file);
     }else{	
     log_error_message
-	("AL Daemon Unit File Parser : Could not retrieve groups from %s timer unit file!\n",
+	("Unit File Parser : Could not retrieve groups from %s timer unit file!\n",
 	 p_file);
     }
     return NULL;
@@ -349,11 +349,11 @@ GKeyFile *ParseUnitFile(char *p_file)
     if (l_keys == NULL) {
      if(strstr(p_file,".timer")==NULL){
        log_error_message
-	  ("AL Daemon Unit File Parser : Error in retrieving keys in service unit file! (%d: %s)",
+	  ("Unit File Parser : Error in retrieving keys in service unit file! (%d: %s)",
 	   l_err->code, l_err->message);
      }else{
       log_error_message
-	  ("AL Daemon Unit File Parser : Error in retrieving keys in timer unit file! (%d: %s)",
+	  ("Unit File Parser : Error in retrieving keys in timer unit file! (%d: %s)",
 	   l_err->code, l_err->message);
      } 
      g_error_free(l_err);
@@ -370,11 +370,11 @@ GKeyFile *ParseUnitFile(char *p_file)
 	if (l_str_value == NULL) {
 	  if(strstr(p_file,".timer")==NULL){
 	   log_error_message
-	      ("AL Daemon Unit File Parser : Error retrieving key's value in service unit file. (%d, %s)\n",
+	      ("Unit File Parser : Error retrieving key's value in service unit file. (%d, %s)\n",
 	       l_err->code, l_err->message);
 	  }else{
 	   log_error_message
-	      ("AL Daemon Unit File Parser : Error retrieving key's value in timer unit file. (%d, %s)\n",
+	      ("Unit File Parser : Error retrieving key's value in timer unit file. (%d, %s)\n",
 	       l_err->code, l_err->message);
 	  }
 	  g_error_free(l_err);
@@ -400,22 +400,22 @@ void SetupUnitFileKey(char *p_file, char *p_key, char *p_val, char *p_unit)
   struct stat l_buf;
   /* test application service file existence and exit with error if it doesn't exist */
   if(strstr(p_file,".timer")==NULL){
-	log_debug_message("AL Daemon Service Unit Setup : Test service file existence for %s\n", p_unit);
+	log_debug_message("Service Unit Setup : Test service file existence for %s\n", p_unit);
 	if(g_stat(p_file,&l_buf)!=0){
-		log_error_message("AL Daemon Service Unit Setup : Service file %s stat !\n",
+		log_error_message("Service Unit Setup : Service file %s stat !\n",
 		p_file);
 		return;
 	}
 	/* open the corresponding key file for the service to write */
-	log_debug_message("AL Daemon Service Unit Setup : Test service file open for %s\n", p_unit);
+	log_debug_message("Service Unit Setup : Test service file open for %s\n", p_unit);
         if ((l_fd_open = g_fopen(p_file, "r+"))==NULL) {
       	  log_error_message
-	    ("AL Daemon Service Unit Setup : Cannot open service unit file %s for adding data !\n",
+	    ("Service Unit Setup : Cannot open service unit file %s for adding data !\n",
 	     p_file);
           return;
         }
   }else{
-  log_debug_message("AL Daemon Service Unit Setup : Test timer file existence for %s\n", p_unit);
+  log_debug_message("Service Unit Setup : Test timer file existence for %s\n", p_unit);
   /* test timer file existence and create if not exists */
   if(g_stat(p_file,&l_buf)!=0){
     /* initialize the error */
@@ -426,17 +426,17 @@ void SetupUnitFileKey(char *p_file, char *p_key, char *p_val, char *p_unit)
     char *l_shutdown_entry =
 	"[Unit]\n Description=Timer for deferred shutdown\n [Timer]\n OnActiveSec=0s\n Unit=poweroff.service\n";
     /* create the key file with permissions */
-    log_debug_message("AL Daemon Timer Unit Setup : Creating timer file for %s\n", p_unit);
+    log_debug_message("Timer Unit Setup : Creating timer file for %s\n", p_unit);
     l_fd_create = g_creat(p_file, O_RDWR | O_CREAT);
     if(l_fd_create==-1){
-	log_error_message("AL Daemon Timer Unit Setup : Cannot create timer file for %s\n", p_unit);
+	log_error_message("Timer Unit Setup : Cannot create timer file for %s\n", p_unit);
  	return;
     }
-    log_debug_message("AL Daemon Timer Unit Setup : Timer file %s created !\n", p_file);
+    log_debug_message("Timer Unit Setup : Timer file %s created !\n", p_file);
     /* open the key file for write */
     if ((l_fd_open = g_fopen(p_file, "r+"))==NULL) {
       log_error_message
-	  ("AL Daemon Timer Unit Setup : Cannot open timer unit file %s for adding data !\n",
+	  ("Timer Unit Setup : Cannot open timer unit file %s for adding data !\n",
 	   p_file);
       return;
     }
@@ -451,25 +451,25 @@ void SetupUnitFileKey(char *p_file, char *p_key, char *p_val, char *p_unit)
 			  strlen(l_shutdown_entry), &l_error);
     }
 
-   log_debug_message("AL Daemon Timer Unit Setup : File %s is wrote !\n",
+   log_debug_message("Timer Unit Setup : File %s is wrote !\n",
 		p_file);
    }
   }
   /* parse the key value file */
   GKeyFile *l_key_file = ParseUnitFile(p_file);
-  log_debug_message("AL Daemon Unit Setup : Key file %s was parsed !\n",
+  log_debug_message("Unit Setup : Key file %s was parsed !\n",
 		p_file);
   /* key file length */
   gsize l_file_length;
-  log_debug_message("AL Daemon Unit Setup : Key file %s is checked !\n",
+  log_debug_message("Unit Setup : Key file %s is checked !\n",
 		p_file);
   /* test key file validity */
   if(!l_key_file){
-	log_error_message("AL Daemon Unit Setup : Key file %s could not be parsed !\n",
+	log_error_message("Unit Setup : Key file %s could not be parsed !\n",
 		p_file);
 	return;
   }
-  log_debug_message("AL Daemon Unit Setup : Setup entry for unit type (timer/service) for %s!\n",
+  log_debug_message("Unit Setup : Setup entry for unit type (timer/service) for %s!\n",
 		p_file);
   /* modify the entries according input params  */
   if(strstr(p_file,".timer")==NULL){
@@ -491,13 +491,13 @@ void SetupUnitFileKey(char *p_file, char *p_key, char *p_val, char *p_unit)
    /* if the key file is for a service file */
    if(strstr(p_file,".timer")==NULL){
     log_error_message
-	("AL Daemon Service Unit Setup : Could not get new file data for service unit! (%d: %s)",
+	("Service Unit Setup : Could not get new file data for service unit! (%d: %s)",
 	 l_err->code, l_err->message);
     g_error_free(l_err);
     return;
    }else{ /* if the key file corresponds to timer file */
     log_error_message
-	("AL Daemon Timer Unit Setup : Could not get new file data for timer unit! (%d: %s)",
+	("Timer Unit Setup : Could not get new file data for timer unit! (%d: %s)",
 	 l_err->code, l_err->message);
     g_error_free(l_err);
     return;
@@ -508,13 +508,13 @@ void SetupUnitFileKey(char *p_file, char *p_key, char *p_val, char *p_unit)
    /* if the key file corresponds to a service file */
    if(strstr(p_file,".timer")==NULL){
     log_error_message
-	("AL Daemon Service Unit Setup : Could not save new file for service unit! (%d: %s)",
+	("Service Unit Setup : Could not save new file for service unit! (%d: %s)",
 	 l_err->code, l_err->message);
     g_error_free(l_err);
     return;
    }else{ /* if the key file corresponds to timer file */
     log_error_message
-	("AL Daemon Timer Unit Setup : Could not save new file for timer unit! (%d: %s)",
+	("Timer Unit Setup : Could not save new file for timer unit! (%d: %s)",
 	 l_err->code, l_err->message);
     g_error_free(l_err);
     return;
@@ -545,7 +545,7 @@ char *GetUnitObjectPath(DBusConnection *p_conn, char *p_unit_name)
                                                     "GetUnit"))) 
   {
     log_error_message
-            ("AL Daemon Get Unit Object Path : Could not allocate message for %s\n", p_unit_name);
+            ("Get Unit Object Path : Could not allocate message for %s\n", p_unit_name);
     goto free_res;
   }
 
@@ -555,7 +555,7 @@ char *GetUnitObjectPath(DBusConnection *p_conn, char *p_unit_name)
                                         DBUS_TYPE_INVALID))
   {
     log_error_message
-            ("AL Daemon Get Unit Object Path : Could not append arguments to message for %s\n", p_unit_name);
+            ("Get Unit Object Path : Could not append arguments to message for %s\n", p_unit_name);
     goto free_res;
   }
 
@@ -563,11 +563,11 @@ char *GetUnitObjectPath(DBusConnection *p_conn, char *p_unit_name)
   if (NULL == (l_reply = dbus_connection_send_with_reply_and_block(p_conn, l_msg, -1, &l_error))) 
   {
     log_error_message
-            ("AL Daemon Get Unit Object Path : Unknown information for %s \n", p_unit_name);
+            ("Get Unit Object Path : Unknown information for %s \n", p_unit_name);
     if (dbus_error_is_set(&l_error))
     {
       log_error_message
-              ("AL Daemon Get Unit Object Path : Error [%s: %s]\n", l_error.name, l_error.message);
+              ("Get Unit Object Path : Error [%s: %s]\n", l_error.name, l_error.message);
     }
     goto free_res;
   }
@@ -578,11 +578,11 @@ char *GetUnitObjectPath(DBusConnection *p_conn, char *p_unit_name)
                                      DBUS_TYPE_INVALID)) 
   {
     log_error_message
-            ("AL Daemon Get Unit Object Path : Failed to parse reply for %s\n", p_unit_name);
+            ("Get Unit Object Path : Failed to parse reply for %s\n", p_unit_name);
     if (dbus_error_is_set(&l_error))
     {
       log_error_message
-              ("AL Daemon Get Unit Object Path : Error [%s: %s]\n", l_error.name, l_error.message);
+              ("Get Unit Object Path : Error [%s: %s]\n", l_error.name, l_error.message);
     }
     goto free_res;
   }
@@ -623,11 +623,11 @@ int SetupApplicationStartupState(DBusConnection *p_conn, char *p_app, bool l_fg_
   if (NULL == (l_path = GetUnitObjectPath(p_conn, l_unit)))
   {
           log_error_message
-                  ("AL Daemon Setup Application Startup State : Unable to extract object path for %s", l_unit);
+                  ("Setup Application Startup State : Unable to extract object path for %s", l_unit);
           return -1;
   }
   log_debug_message
-          ("AL Daemon Setup Application Startup State : Extracted object path for %s\n",
+          ("Setup Application Startup State : Extracted object path for %s\n",
            l_unit);
 
   /* send state (fg/bg) property setup method call to systemd */
@@ -638,7 +638,7 @@ int SetupApplicationStartupState(DBusConnection *p_conn, char *p_app, bool l_fg_
 				    "Set"))) { 
 
     log_error_message
-	("AL Daemon Method Call Listener : Could not allocate message when setting state property to systemd! \n %s \n",
+	("Method Call Listener : Could not allocate message when setting state property to systemd! \n %s \n",
 	 l_err.message);
     if (l_msg_state)
       dbus_message_unref(l_msg_state);
@@ -648,24 +648,24 @@ int SetupApplicationStartupState(DBusConnection *p_conn, char *p_app, bool l_fg_
     return -1;
   }
   log_debug_message
-	("AL Daemon Setup Application Startup State  : Called property set method call for %s\n",
+	("Setup Application Startup State  : Called property set method call for %s\n",
 	 p_app);
    /* initialize the iterator for arguments append */
    dbus_message_iter_init_append(l_msg_state, &l_iter);
   log_debug_message
-	("AL Daemon Setup Application Startup State  : Initialized iterator for property value setup method call for %s\n", l_unit);
+	("Setup Application Startup State  : Initialized iterator for property value setup method call for %s\n", l_unit);
    /* append interface for property setting */
    char *l_iface = "org.freedesktop.systemd1.Service";
    if(!dbus_message_iter_append_basic(&l_iter, 
 				      DBUS_TYPE_STRING, 
 				      &l_iface)){
 	log_error_message
-	("AL Daemon Setup Application Startup State : Could not append interface to message for %s \n",
+	("Setup Application Startup State : Could not append interface to message for %s \n",
 	 p_app);
 	return -1;
    }
    log_debug_message
-	("AL Daemon Setup Application Startup State  : Appended interface name for property set for %s\n",
+	("Setup Application Startup State  : Appended interface name for property set for %s\n",
 	 l_unit);
    /* append property name */
    char *l_prop = "Foreground";
@@ -673,35 +673,35 @@ int SetupApplicationStartupState(DBusConnection *p_conn, char *p_app, bool l_fg_
 				      DBUS_TYPE_STRING, 
 				      &l_prop)){ 
 	log_error_message
-	("AL Daemon Setup Application Startup State : Could not append property to message for %s \n",
+	("Setup Application Startup State : Could not append property to message for %s \n",
 	 l_unit);
 	return -1;
    }
    log_debug_message
-	("AL Daemon Setup Application Startup State  : Appended property name to setup for %s\n",
+	("Setup Application Startup State  : Appended property name to setup for %s\n",
 	 l_unit);
    /* append the variant that stores the value for the foreground state property */
     if(!dbus_message_iter_open_container(&l_iter, 
 				     DBUS_TYPE_VARIANT, 
 				     DBUS_TYPE_BOOLEAN_AS_STRING,
 				     &l_variant)){
-	log_error_message("AL Daemon Setup Application Startup State : Not enough memory to open container \n", 0);
+	log_error_message("Setup Application Startup State : Not enough memory to open container \n", 0);
 	return -1;
     }
     log_debug_message
-	("AL Daemon Setup Application Startup State  : Opened container for property value setup for %s\n",
+	("Setup Application Startup State  : Opened container for property value setup for %s\n",
 	 l_unit);
     dbus_bool_t l_state = (dbus_bool_t)l_fg_state;
     if(!dbus_message_iter_append_basic (&l_variant, 
 				        DBUS_TYPE_BOOLEAN,  
                                         &l_state)){
     	log_error_message
-	("AL Daemon Setup Application Startup State : Could not append property value to message for %s \n",
+	("Setup Application Startup State : Could not append property value to message for %s \n",
 	 l_unit);
      	return -1;
     }
     log_debug_message
-	("AL Daemon Setup Application Startup State  : Set the state (fg/bg) value in variant for %s\n",
+	("Setup Application Startup State  : Set the state (fg/bg) value in variant for %s\n",
 	 l_unit);
     if(!dbus_message_iter_close_container (&l_iter, 
 					   &l_variant)){
@@ -709,14 +709,14 @@ int SetupApplicationStartupState(DBusConnection *p_conn, char *p_app, bool l_fg_
 	return -1;
     }
     log_debug_message
-	("AL Daemon Setup Application Startup State  : Closed container for property value setup for %s\n",
+	("Setup Application Startup State  : Closed container for property value setup for %s\n",
 	 l_unit);     
    /* wait for the reply from systemd after setting the state (fg/bg) property */
    if (!(l_reply_state =
        dbus_connection_send_with_reply_and_block(p_conn, l_msg_state,
 						 -1, &l_err))) {
     	log_error_message
-	("AL Daemon Method Call Listener : Didn't received a reply for state property method call: %s \n",l_err.message);
+	("Method Call Listener : Didn't received a reply for state property method call: %s \n",l_err.message);
     if (l_msg_state)
       dbus_message_unref(l_msg_state);
     if (l_reply_state)
@@ -724,7 +724,7 @@ int SetupApplicationStartupState(DBusConnection *p_conn, char *p_app, bool l_fg_
     dbus_error_free(&l_err);
     return -1;
    }
-   log_debug_message("AL Daemon Method Call Listener Setup Application Startup State : Reply after setting state for %s was received!\n ", l_unit);
+   log_debug_message("Method Call Listener Setup Application Startup State : Reply after setting state for %s was received!\n ", l_unit);
    if (NULL != l_path)
            free(l_path);
   return 0;
@@ -744,7 +744,7 @@ char *ExtractUnitNameTemplate(char *unit_name) {
         l_dim = l_p - unit_name + 1;
 	/* init the result */
         if (!(l_res = (char *) malloc(sizeof(char)*(l_dim + 1)))){
-		log_error_message("AL Daemon Template Name Extractor : Cannot allocate template handler for %s !\n", unit_name);
+		log_error_message("Template Name Extractor : Cannot allocate template handler for %s !\n", unit_name);
                 return NULL;
 	}
 	/* extract the template name */

@@ -141,13 +141,13 @@ static void al_dbus_init(ALDbus * server
 	/* Register a service name */
 	if (!org_freedesktop_DBus_request_name(proxy, AL_METHOD_INTERFACE,
 					       0, &request_ret, &error)) {
-		g_critical("Unable to register AL Daemon service: %s\n",
+		log_error_message("Unable to register AL Daemon service: %s\n",
 			   error->message);
 		exit(-9);
 		g_error_free(error);
 	} else if (request_ret != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER) {
-		g_critical("Unable to register AL Daemon service.  Is another"
-			   " instance already running?");
+		log_error_message("Unable to register AL Daemon service.  Is another"
+			   " instance already running?", 0);
 		exit(-10);
 	} else {
 		/* We got the service name, so register the object. */
@@ -186,12 +186,12 @@ static void al_dbus_finalize(ALDbus * server
      */
 	if (!org_freedesktop_DBus_release_name(proxy, AL_METHOD_INTERFACE,
 					       &request_ret, &error)) {
-		g_critical("Unable to release AL Daemon service: %s\n",
+		log_error_message("Unable to release AL Daemon service: %s\n",
 			   error->message);
 		g_error_free(error);
 	} else if (request_ret != DBUS_RELEASE_NAME_REPLY_RELEASED) {
-		g_critical("Unable to release AL Daemon service.  Is another"
-			   " instance already running?");
+		log_error_message("Unable to release AL Daemon service.  Is another"
+			   " instance already running?", 0);
 	}
 
 	g_type_free_instance((GTypeInstance *) server);
@@ -220,6 +220,7 @@ gboolean initialize_al_dbus()
 	int l_err;
 
 	g_type_init();
+	dbus_g_thread_init();
 
 	if (success == TRUE) {
 		if (pGError != NULL) {
@@ -230,8 +231,7 @@ gboolean initialize_al_dbus()
 		g_conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, &pGError);
 
 		if (!g_conn) {
-			g_critical(G_STRLOC
-				   " AL Daemon Init : Failed to open connection to bus: %s\n",
+			log_error_message("Init : Failed to open connection to bus: %s\n",
 				   pGError->message);
 			g_error_free(pGError);
 			success = FALSE;
@@ -249,7 +249,7 @@ gboolean initialize_al_dbus()
 						     SYSTEMD_SERVICE_NAME,
 						     SYSTEMD_PATH,
 						     SYSTEMD_INTERFACE))) {
-		g_critical("Failed to get proxy to Systemd !");
+		log_error_message("Failed to get proxy to Systemd !", 0);
 		goto free_res;
 	}
 
@@ -273,7 +273,7 @@ gboolean initialize_al_dbus()
 
 gboolean terminate_al_dbus()
 {
-	g_debug(G_STRLOC "Shutting down the AL Daemon ...");
+	log_debug_message("Shutting down the AL Daemon ...\n", 0);
 
 	if (g_al_proxy) {
 		g_object_unref(g_al_proxy);
@@ -300,6 +300,7 @@ gboolean terminate_al_dbus()
 
 gboolean al_dbus_run(ALDbus * server,
 		     gchar * command_line,
+		     gint parent_pid,
 		     gboolean foreground, DBusGMethodInvocation * context)
 {
 
@@ -329,7 +330,7 @@ gboolean al_dbus_run(ALDbus * server,
 	DBusConnection *l_conn =
 	    (DBusConnection *) dbus_g_connection_get_connection(g_conn);
 	log_debug_message
-	    ("AL Daemon Method Call Listener Run: Arguments were extracted for %s\n",
+	    ("Method Call Listener Run: Arguments were extracted for %s\n",
 	     command_line);
 	/* check command line name for deferred binaries */
 	if ((strstr(command_line, "reboot") != NULL)
@@ -343,7 +344,7 @@ gboolean al_dbus_run(ALDbus * server,
 		/* restore the command string for future use */
 		strcpy(command_line, command_line_copy);
 	}
-	log_debug_message("AL Daemon Method Call Listener : Run app: %s\n",
+	log_debug_message("Method Call Listener : Run app: %s\n",
 			  command_line);
 	/* if reboot / shutdown unit add deferred functionality in timer file */
 	if (strstr(command_line, "reboot") != NULL) {
@@ -358,13 +359,15 @@ gboolean al_dbus_run(ALDbus * server,
 	/* check for application service file existence */
 	if (!AppExistsInSystem(command_line)) {
 		log_error_message
-		    ("AL Daemon Method Call Listener : Cannot run %s !\n Application %s is not found in the system !\n",
+		    ("Method Call Listener : Cannot run %s !\n Application %s is not found in the system !\n",
 		     command_line, command_line);
+		l_new_pid = (int)AppPidFromName(command_line);
+		dbus_g_method_return(context, l_new_pid);
 		return success;
 	} else {
 		if ((l_r = (int)AppPidFromName(command_line)) != 0) {
 			log_error_message
-			    ("AL Daemon Method Call Listener : Cannot run %s !\n",
+			    ("Method Call Listener : Cannot run %s !\n",
 			     command_line);
 			/* check the application current state before starting it */
 			/* extract the application state for testing existence */
@@ -431,7 +434,9 @@ gboolean al_dbus_run(ALDbus * server,
 				    || (strcmp(l_sub_state, "dead") != 0)
 				    || (strcmp(l_sub_state, "failed") != 0)) {
 					log_error_message
-					    ("AL Daemon Method Call Listener : Cannot run %s !\n Application/application group %s is already running in the system !\n", command_line, command_line);
+					    ("Method Call Listener : Cannot run %s !\n Application/application group %s is already running in the system !\n", command_line, command_line);
+					l_new_pid = (int)AppPidFromName(command_line);
+					dbus_g_method_return(context, l_new_pid);
 					return success;
 				}
 			}
@@ -453,18 +458,23 @@ gboolean al_dbus_run(ALDbus * server,
 			       DBUS_TYPE_G_OBJECT_PATH,
 			       &l_service_path, G_TYPE_INVALID)) {
 		log_error_message("Method call failed: %s\n", l_err->message);
+		l_new_pid = 0;
+		dbus_g_method_return(context, l_new_pid);
 		goto free_res;
 	}
 	/* setup foreground property in systemd and wait for reply */
 	if (SetupApplicationStartupState(l_conn, command_line, foreground) != 0) {
 		log_error_message
-		    ("AL Daemon Method Call Listener : Cannot setup fg/bg state for %s , application will run in former state or default state \n",
+		    ("Method Call Listener : Cannot setup fg/bg state for %s , application will run in former state or default state \n",
 		     command_line);
 	}
 	/* call the Run command */
-	Run(command_line, 0, foreground, l_new_pid);
-	log_message("Called Run  : [ %s | %s ]\n", command_line,
+	Run(command_line, parent_pid, foreground);
+	l_new_pid = (int)AppPidFromName(command_line);
+	log_debug_message("Called Run  : [ %s | %s ]\n", command_line,
 		    (foreground == true) ? "true" : "false");
+	dbus_g_method_return(context, l_new_pid);
+
 free_res:
 	/* resources free */
 	if(command_line_copy)
@@ -490,6 +500,7 @@ free_res:
 
 gboolean al_dbus_run_as(ALDbus * server,
 			gchar * command_line,
+			gint parent_pid,
 			gboolean foreground,
 			gint app_uid,
 			gint app_gid, DBusGMethodInvocation * context)
@@ -521,7 +532,7 @@ gboolean al_dbus_run_as(ALDbus * server,
 	DBusConnection *l_conn =
 	    (DBusConnection *) dbus_g_connection_get_connection(g_conn);
 	log_debug_message
-	    ("AL Daemon Method Call Listener RunAs: Arguments were extracted for %s\n",
+	    ("Method Call Listener RunAs: Arguments were extracted for %s\n",
 	     command_line);
 	/* check command line name for deferred binaries */
 	if ((strstr(command_line, "reboot") != NULL)
@@ -535,7 +546,7 @@ gboolean al_dbus_run_as(ALDbus * server,
 		/* restore the command string for future use */
 		strcpy(command_line, command_line_copy);
 	}
-	log_debug_message("AL Daemon Method Call Listener : RunAs app: %s\n",
+	log_debug_message("Method Call Listener : RunAs app: %s\n",
 			  command_line);
 	/* if reboot / shutdown unit add deferred functionality in timer file */
 	if (strstr(command_line, "reboot") != NULL) {
@@ -550,13 +561,15 @@ gboolean al_dbus_run_as(ALDbus * server,
 	/* check for application service file existence */
 	if (!AppExistsInSystem(command_line)) {
 		log_error_message
-		    ("AL Daemon Method Call Listener : Cannot runas %s !\n Application %s is not found in the system !\n",
+		    ("Method Call Listener : Cannot runas %s !\n Application %s is not found in the system !\n",
 		     command_line, command_line);
+		l_new_pid = 0;
+		dbus_g_method_return(context, l_new_pid);
 		goto free_res;
 	} else {
 		if ((l_r = (int)AppPidFromName(command_line)) != 0) {
 			log_error_message
-			    ("AL Daemon Method Call Listener : Cannot runas %s !\n",
+			    ("Method Call Listener : Cannot runas %s !\n",
 			     command_line);
 			/* check the application current state before starting it */
 			/* extract the application state for testing existence */
@@ -623,8 +636,10 @@ gboolean al_dbus_run_as(ALDbus * server,
 				    || (strcmp(l_sub_state, "dead") != 0)
 				    || (strcmp(l_sub_state, "failed") != 0)) {
 					log_error_message
-					    ("AL Daemon Method Call Listener : Cannot runas %s !\n Application/application group %s is already running in the system !\n",
+					    ("Method Call Listener : Cannot runas %s !\n Application/application group %s is already running in the system !\n",
 					     command_line, command_line);
+					l_new_pid = (int)AppPidFromName(command_line);
+					dbus_g_method_return(context, l_new_pid);
 					goto free_res;
 				}
 			}
@@ -647,20 +662,27 @@ gboolean al_dbus_run_as(ALDbus * server,
 			       &l_service_path, G_TYPE_INVALID)) {
 		g_print("[%s] Method call failed: %s\n", __func__,
 			l_err->message);
+		l_new_pid = 0;
+		dbus_g_method_return(context, l_new_pid);
 		goto free_res;
 	}
-	log_message("Called RunAs : [ %s | %s | %d | %d ]\n", command_line,
+	log_debug_message("Called RunAs : [ %s | %s | %d | %d ]\n", command_line,
 		    (foreground == TRUE) ? "true" : "false", app_uid, app_gid);
-	RunAs(command_line, 0, foreground, app_uid, app_gid, l_new_pid);
+	RunAs(command_line, parent_pid, foreground, app_uid, app_gid);
 	/* setup the internal state information for the application */
 	if (SetupApplicationStartupState(l_conn, command_line, foreground) != 0) {
 		log_error_message
-		    ("AL Daemon Method Call Listener : Cannot setup fg/bg state for %s , application will runas %d in former state or default state \n",
+		    ("Method Call Listener : Cannot setup fg/bg state for %s , application will runas %d in former state or default state \n",
 		     command_line, app_uid);
+		l_new_pid = (int)AppPidFromName(command_line);
+		dbus_g_method_return(context, l_new_pid);
 		goto free_res;
 	}
+	l_new_pid = (int)AppPidFromName(command_line);
+	al_dbus_task_started(g_al_dbus, l_new_pid, command_line);
+	dbus_g_method_return(context, l_new_pid);
 
- free_res:
+free_res:
 	if(command_line_copy)
 		free(command_line_copy);
 	if(command_line_deferred)
@@ -672,7 +694,7 @@ gboolean al_dbus_run_as(ALDbus * server,
 }
 
 gboolean al_dbus_stop(ALDbus * server,
-		      guint app_pid, DBusGMethodInvocation * context)
+		      gint app_pid, DBusGMethodInvocation * context)
 {
 
 	/* callback return */
@@ -699,18 +721,18 @@ gboolean al_dbus_stop(ALDbus * server,
 	/* extract application name from pid */
 	l_r = (int)AppNameFromPid(app_pid, l_app);
 	log_debug_message
-	    ("AL Daemon Method Call Listener : Stopping application with pid %d\n",
+	    ("Method Call Listener : Stopping application with pid %d\n",
 	     app_pid);
 	if (l_r != 1) {
 		/* test for application service file existence */
 		if (!AppExistsInSystem(l_app)) {
 			log_error_message
-			    ("AL Daemon Method Call Listener : Cannot stop %s !\n Application %s is not found in the system !\n",
+			    ("Method Call Listener : Cannot stop %s !\n Application %s is not found in the system !\n",
 			     l_app, l_app);
 			goto free_res;
 		}
 		log_error_message
-		    ("AL Daemon Method Call Listener : Cannot stop %s !\n",
+		    ("Method Call Listener : Cannot stop %s !\n",
 		     l_app);
 		/* check the application current state before stopping it */
 		/* extract the application state for testing existence */
@@ -767,6 +789,7 @@ gboolean al_dbus_stop(ALDbus * server,
 		/* if the name of the service corresponds to the name of the process to start call Stop */
 		if (AppPidFromName(l_app) != 0) {
 			Stop(app_pid);
+			dbus_g_method_return(context);
 			return success;
 		}
 		/* if the name of the service differs from the name of the process 
@@ -775,10 +798,11 @@ gboolean al_dbus_stop(ALDbus * server,
 		l_ret = system(l_cmd);
 		if (l_ret != 0) {
 			log_error_message
-			    ("AL Daemon Method Call Listener : Cannot stop %s !\n Application %s is already stopped !\n",
+			    ("Method Call Listener : Cannot stop %s !\n Application %s is already stopped !\n",
 			     l_app, l_app);
 			goto free_res;
 		}
+		dbus_g_method_return(context);
 		return success;
 	}
 	/* test if we have a target and stop all the applications started by it */
@@ -788,10 +812,11 @@ gboolean al_dbus_stop(ALDbus * server,
 		l_ret = system(l_cmd);
 		if (l_ret != 0) {
 			log_error_message
-			    ("AL Daemon Method Call Listener : Cannot stop %s !\n Application group %s is already stopped !\n",
+			    ("Method Call Listener : Cannot stop %s !\n Application group %s is already stopped !\n",
 			     l_app, l_app);
 			goto free_res;
 		}
+		dbus_g_method_return(context);
 		return success;
 	}
 
@@ -800,12 +825,15 @@ free_res:
 		free(l_app);
 	if(l_app_copy)	
 		free(l_app_copy);
+
+	dbus_g_method_return(context);
+
 	return success;
 
 }
 
 gboolean al_dbus_resume(ALDbus * server,
-			guint app_pid, DBusGMethodInvocation * context)
+			gint app_pid, DBusGMethodInvocation * context)
 {
 
 	gboolean success = TRUE;
@@ -831,18 +859,18 @@ gboolean al_dbus_resume(ALDbus * server,
 	/* extract application name from pid */
 	l_r = (int)AppNameFromPid(app_pid, l_app);
 	log_debug_message
-	    ("AL Daemon Method Call Listener : Resuming application %s\n",
+	    ("Method Call Listener : Resuming application %s\n",
 	     l_app);
 	if (l_r != 1) {
 		/* test for application service file existence */
 		if (!AppExistsInSystem(l_app)) {
 			log_error_message
-			    ("AL Daemon Method Call Listener : Cannot resume %s !\n Application %s is not found in the system !\n",
+			    ("Method Call Listener : Cannot resume %s !\n Application %s is not found in the system !\n",
 			     l_app, l_app);
 			goto free_res;
 		}
 		log_error_message
-		    ("AL Daemon Method Call Listener : Cannot resume %s !\n",
+		    ("Method Call Listener : Cannot resume %s !\n",
 		     l_app);
 		/* check the application current state before starting it */
 		/* extract the application state for testing existence */
@@ -868,26 +896,29 @@ gboolean al_dbus_resume(ALDbus * server,
 			    || (strcmp(l_sub_state, "dead") != 0)
 			    || (strcmp(l_sub_state, "failed") != 0)) {
 				log_error_message
-				    ("AL Daemon Method Call Listener : Cannot run %s !\n Application %s is already running in the system !\n",
+				    ("Method Call Listener : Cannot run %s !\n Application %s is already running in the system !\n",
 				     l_app, l_app);
 				goto free_res;
 			}
 		}
 	}
 	Resume(app_pid);
-	log_message("Called Resume : [%d] \n", app_pid);
+	log_debug_message("Called Resume : [%d] \n", app_pid);
 
 free_res:
 	if(l_app)
 		free(l_app);
 	if(l_app_copy)	
 		free(l_app_copy);
+
+	dbus_g_method_return(context);
+
 	return success;
 
 }
 
 gboolean al_dbus_suspend(ALDbus * server,
-			 guint app_pid, DBusGMethodInvocation * context)
+			 gint app_pid, DBusGMethodInvocation * context)
 {
 
 	gboolean success = TRUE;
@@ -913,18 +944,18 @@ gboolean al_dbus_suspend(ALDbus * server,
 	/* extract application name from pid */
 	l_r = (int)AppNameFromPid(app_pid, l_app);
 	log_debug_message
-	    ("AL Daemon Method Call Listener : Suspending application %s\n",
+	    ("Method Call Listener : Suspending application %s\n",
 	     l_app);
 	if (l_r != 1) {
 		/* test for application service file existence */
 		if (!AppExistsInSystem(l_app)) {
 			log_error_message
-			    ("AL Daemon Method Call Listener : Cannot suspend %s !\n Application %s is not found in the system !\n",
+			    ("Method Call Listener : Cannot suspend %s !\n Application %s is not found in the system !\n",
 			     l_app, l_app);
 			goto free_res;
 		}
 		log_error_message
-		    ("AL Daemon Method Call Listener : Cannot suspend %s !\n ",
+		    ("Method Call Listener : Cannot suspend %s !\n ",
 		     l_app);
 		/* check the application current state before starting it */
 		/* extract the application state for testing existence */
@@ -951,24 +982,27 @@ gboolean al_dbus_suspend(ALDbus * server,
 		    && (strcmp(l_active_state, "deactivating") != 0)) {
 
 			log_error_message
-			    ("AL Daemon Method Call Listener : Cannot suspend %s !\n Application %s is already suspended !\n",
+			    ("Method Call Listener : Cannot suspend %s !\n Application %s is already suspended !\n",
 			     l_app, l_app);
 			goto free_res;
 		}
 	}
 	Suspend(app_pid);
-	log_message("Called Suspend : [%d] \n", app_pid);
+	log_debug_message("Called Suspend : [%d] \n", app_pid);
 
 free_res:
 	if(l_app)
 		free(l_app);
 	if(l_app_copy)	
 		free(l_app_copy);
+
+	dbus_g_method_return(context);
+
 	return success;
 }
 
 gboolean al_dbus_stop_as(ALDbus * server,
-			 guint app_pid,
+			 gint app_pid,
 			 gint app_uid,
 			 gint app_gid, DBusGMethodInvocation * context)
 {
@@ -996,18 +1030,18 @@ gboolean al_dbus_stop_as(ALDbus * server,
 	/* extract application name from pid */
 	l_r = (int)AppNameFromPid(app_pid, l_app);
 	log_debug_message
-	    ("AL Daemon Method Call Listener : Stopping application with pid %d using stopas !\n",
+	    ("Method Call Listener : Stopping application with pid %d using stopas !\n",
 	     app_pid);
 	if (l_r != 1) {
 		/* test for application service file existence */
 		if (!AppExistsInSystem(l_app)) {
 			log_error_message
-			    ("AL Daemon Method Call Listener : Cannot stop %s using stopas ! Application is not found in the system !\n",
+			    ("Method Call Listener : Cannot stop %s using stopas ! Application is not found in the system !\n",
 			     l_app);
 			goto free_res;
 		}
 		log_error_message
-		    ("AL Daemon Method Call Listener : Cannot stopas %s !\n",
+		    ("Method Call Listener : Cannot stopas %s !\n",
 		     l_app);
 		/* check the application current state before stopping it */
 		/* extract the application state for testing existence */
@@ -1034,14 +1068,14 @@ gboolean al_dbus_stop_as(ALDbus * server,
 		    && (strcmp(l_active_state, "deactivating") != 0)) {
 
 			log_error_message
-			    ("AL Daemon Method Call Listener : Cannot stopas %s !\n Application %s is already stopped !\n",
+			    ("Method Call Listener : Cannot stopas %s !\n Application %s is already stopped !\n",
 			     l_app, l_app);
 			goto free_res;
 		}
 	}
 	/* stopas the application */
 	StopAs(app_pid, app_uid, app_gid);
-	log_message("Called Stopas : [%d | %d | %d ] \n", app_pid, app_uid,
+	log_debug_message("Called Stopas : [%d | %d | %d ] \n", app_pid, app_uid,
 		    app_gid);
 
 free_res:
@@ -1051,6 +1085,9 @@ free_res:
 		free(l_app_copy);
 	if(l_app_status)
 		free(l_app_status);
+
+	dbus_g_method_return(context);
+
 	return success;
 }
 
@@ -1059,19 +1096,21 @@ gboolean al_dbus_restart(ALDbus * server,
 {
 
 	gboolean success = TRUE;
-	log_debug_message("AL Daemon Method Call Listener : Restart app: %s\n",
+	log_debug_message("Method Call Listener : Restart app: %s\n",
 			  app_name);
 	/* check for application service file existence */
 	if (!AppExistsInSystem(app_name)) {
 		log_error_message
-		    ("AL Daemon Method Call Listener : Cannot restart %s !\n Application %s is not found in the system !\n",
+		    ("Method Call Listener : Cannot restart %s !\n Application %s is not found in the system !\n",
 		     app_name, app_name);
 		goto free_res;
 	}
 	Restart(app_name);
-	log_message("Called Restart : [%s] \n", app_name);
+	log_debug_message("Called Restart : [%s] \n", app_name);
 
 free_res:
+	dbus_g_method_return(context);
+
 	return success;
 }
 
@@ -1105,7 +1144,7 @@ gboolean al_dbus_change_task_state(ALDbus * server,
 	/* test for application service file existence */
 	if (!AppExistsInSystem(l_app_name)) {
 	  log_error_message
-	      ("AL Daemon Change Task State : Cannot change state for %s !\n Application %s is not found in the system !\n",
+	      ("Change Task State : Cannot change state for %s !\n Application %s is not found in the system !\n",
 	       l_app_name, l_app_name);
 	  goto free_res;
 	   }
@@ -1113,7 +1152,7 @@ gboolean al_dbus_change_task_state(ALDbus * server,
 	if (NULL == (l_path = GetUnitObjectPath((DBusConnection*)dbus_g_connection_get_connection(g_conn), strcat(l_app_name, ".service"))))
 	  {
           log_error_message
-                  ("AL Daemon Change Task State : Unable to extract object path for %s", l_app_name);
+                  ("Change Task State : Unable to extract object path for %s", l_app_name);
           goto free_res;
   	}
 	/* get the interface for the current service */
@@ -1132,16 +1171,18 @@ gboolean al_dbus_change_task_state(ALDbus * server,
 				G_TYPE_STRING, "Foreground",
 				G_TYPE_VALUE, &l_set_value,
 				G_TYPE_INVALID, G_TYPE_INVALID)){
-		log_error_message("AL Daemon Change Task State : Failed to change task foreground task state : %s \n", l_err->message);
+		log_error_message("Change Task State : Failed to change task foreground task state : %s \n", l_err->message);
 		g_value_unset(&l_set_value);
 		goto free_res;
 	}	
-	log_message("Called ChangeTaskState : [%d | %s] \n", app_pid,
+	log_debug_message("Called ChangeTaskState : [%d | %s] \n", app_pid,
 		    (foreground == TRUE) ? "true" : "false");
         ChangeTaskState(app_pid, foreground);
 	/* emit task changed state complete */
 	al_dbus_change_task_state_complete(g_al_dbus, l_app_name, (foreground == TRUE) ? "true" : "false");
 	
+	dbus_g_method_return(context);
+
 	/* resources free */
 	if(l_path)
 		free(l_path);
@@ -1159,6 +1200,9 @@ free_res:
 		g_object_unref(l_prop_proxy);
 		l_prop_proxy = NULL;
 	}
+	
+	dbus_g_method_return(context);
+
 	return success;
 }
 
@@ -1452,7 +1496,7 @@ void al_dbus_signal_dispatcher()
 }
 
 /* High level interface for the AL Daemon */
-void Run(char *p_commandLine, int p_parentPID, bool p_isFg, int p_newPID)
+void Run(char *p_commandLine, int p_parentPID, bool p_isFg)
 {
 	/* store the return code */
 	int l_ret;
@@ -1460,7 +1504,7 @@ void Run(char *p_commandLine, int p_parentPID, bool p_isFg, int p_newPID)
 	int l_pid;
 	/* state string */
 	char *l_flag = malloc(DIM_MAX * sizeof(l_flag));
-	log_message("AL Daemon Run : %s started with run !\n", p_commandLine);
+	log_message("Run : %s started with run !\n", p_commandLine);
 	/* the command line for the application */
 	char l_cmd[DIM_MAX];
 	/* form the call string for systemd */
@@ -1489,32 +1533,29 @@ void Run(char *p_commandLine, int p_parentPID, bool p_isFg, int p_newPID)
 	else
 		strcpy(l_flag, "background");
 	/* change the state of the application given by pid */
-	log_message("AL Daemon Run : Application %s will run in %s \n",
+	log_message("Run : Application %s will run in %s \n",
 		    p_commandLine, l_flag);
 	/* systemd invocation */
 	l_ret = system(l_cmd);
 	if (l_ret == -1) {
 		if ((AppExistsInSystem(p_commandLine)) == 1) {
 			log_error_message
-			    ("AL Daemon Run : Application cannot be started with run! Err: %s\n",
+			    ("Run : Application cannot be started with run! Err: %s\n",
 			     strerror(errno));
 		}
 		if ((AppExistsInSystem(p_commandLine)) == 2) {
 			log_error_message
-			    ("AL Daemon Run : Applications group cannot be started with run! Err: %s\n",
+			    ("Run : Applications group cannot be started with run! Err: %s\n",
 			     strerror(errno));
 		}
 		return;
 	}
-	/* extract the PID from the application name only if the start is valid */
-	l_pid = (int)AppPidFromName(p_commandLine);
-	p_newPID = l_pid;
-	log_debug_message("AL Daemon Run : %s was started with run !\n",
+	log_debug_message("Run : %s was started with run !\n",
 			  p_commandLine);
 }
 
 void RunAs(char *p_commandLine, int p_parentPID, bool p_isFg, int p_euid,
-	   int p_egid, int p_newPID)
+	   int p_egid)
 {
 	/* store the return code */
 	int l_ret;
@@ -1523,7 +1564,7 @@ void RunAs(char *p_commandLine, int p_parentPID, bool p_isFg, int p_euid,
 	/* local handlers for user and group to be written in the service file */
 	char *l_user = malloc(DIM_MAX * sizeof(l_user));
 	char *l_group = malloc(DIM_MAX * sizeof(l_group));
-	log_message("AL Daemon RunAs : %s started with runas !\n",
+	log_message("RunAs : %s started with runas !\n",
 		    p_commandLine);
 	/* the command line for the application */
 	char l_cmd[DIM_MAX];
@@ -1535,7 +1576,7 @@ void RunAs(char *p_commandLine, int p_parentPID, bool p_isFg, int p_euid,
 	char *l_temp = ExtractUnitNameTemplate(p_commandLine);
 	if (l_temp == NULL) {
 		log_error_message
-		    ("AL Daemon RunAs : Cannot allocate template handler for %s !\n",
+		    ("RunAs : Cannot allocate template handler for %s !\n",
 		     p_commandLine);
 		return;
 	}
@@ -1555,13 +1596,13 @@ void RunAs(char *p_commandLine, int p_parentPID, bool p_isFg, int p_euid,
 	/* extract user name and group name from uid and gid */
 	if (MapUidToUser(p_euid, l_user) != 0) {
 		log_error_message
-		    ("AL Daemon RunAs : Cannot map uid to user for %s\n",
+		    ("RunAs : Cannot map uid to user for %s\n",
 		     p_commandLine);
 		return;
 	}
 	if (MapGidToGroup(p_egid, l_group) != 0) {
 		log_error_message
-		    ("AL Daemon RunAs : Cannot map gid to user for %s\n",
+		    ("RunAs : Cannot map gid to user for %s\n",
 		     p_commandLine);
 		return;
 	}
@@ -1570,7 +1611,7 @@ void RunAs(char *p_commandLine, int p_parentPID, bool p_isFg, int p_euid,
 	SetupUnitFileKey(l_srv_path, "User", l_user, p_commandLine);
 	SetupUnitFileKey(l_srv_path, "Group", l_group, p_commandLine);
 	log_debug_message
-	    ("AL Daemon RunAs : Service file was updated with User=%s and Group=%s information !\n",
+	    ("RunAs : Service file was updated with User=%s and Group=%s information !\n",
 	     l_user, l_group);
 	/* test application state */
 	if (p_isFg == TRUE)
@@ -1581,27 +1622,24 @@ void RunAs(char *p_commandLine, int p_parentPID, bool p_isFg, int p_euid,
 	l_ret = system("systemctl daemon-reload --system");
 	if (l_ret == -1) {
 		log_error_message
-		    ("AL Daemon RunAs : After setting the service file reload systemd manager configuration failed ! Err: %s\n",
+		    ("RunAs : After setting the service file reload systemd manager configuration failed ! Err: %s\n",
 		     strerror(errno));
 		return;
 	}
 	/* change the state of the application given by pid */
 	log_debug_message
-	    ("AL Daemon RunAs : Application %s will runas %s in %s \n",
+	    ("RunAs : Application %s will runas %s in %s \n",
 	     p_commandLine, l_user, l_flag);
 
 	/* systemd invocation */
 	l_ret = system(l_cmd);
 	if (l_ret == -1) {
 		log_error_message
-		    ("AL Daemon RunAs : Application cannot be started with runas! Err: %s\n",
+		    ("RunAs : Application cannot be started with runas! Err: %s\n",
 		     strerror(errno));
 		return;
 	}
-	/* extract the PID from the application name only if the start is valid */
-	l_pid = (int)AppPidFromName(p_commandLine);
-	p_newPID = l_pid;
-	log_debug_message("AL Daemon RunAs : %s was started with runas !\n",
+	log_debug_message("RunAs : %s was started with runas !\n",
 			  p_commandLine);
 }
 
@@ -1612,7 +1650,7 @@ void Suspend(int p_pid)
 	/* to suspend the application a SIGSTOP signal is sent */
 	if ((l_ret = kill(p_pid, SIGSTOP)) == -1) {
 		log_error_message
-		    ("AL Daemon Suspend : %s cannot be suspended ! Err : %s\n",
+		    ("Suspend : %s cannot be suspended ! Err : %s\n",
 		     p_pid, strerror(errno));
 	}
 }
@@ -1624,7 +1662,7 @@ void Resume(int p_pid)
 	/* to suspend the application a SIGSTOP signal is sent */
 	if ((l_ret = kill(p_pid, SIGCONT)) == -1) {
 		log_error_message
-		    ("AL Daemon Resume : %s cannot be resumed ! Err : %s\n",
+		    ("Resume : %s cannot be resumed ! Err : %s\n",
 		     p_pid, strerror(errno));
 	}
 }
@@ -1641,7 +1679,7 @@ void Stop(int p_pid)
 	if (l_ret == 1) {
 		l_commandLine = l_app_name;
 		char l_cmd[DIM_MAX];
-		log_debug_message("AL Daemon Stop : %s stopped with stop !\n",
+		log_debug_message("Stop : %s stopped with stop !\n",
 				  l_commandLine);
 		/* form the systemd command line string */
 		/* check if single service will be stopped */
@@ -1653,12 +1691,12 @@ void Stop(int p_pid)
 		l_ret = system(l_cmd);
 		if (l_ret != 0) {
 			log_error_message
-			    ("AL Daemon Stop : Application cannot be stopped with stop! Err: %s\n",
+			    ("Stop : Application cannot be stopped with stop! Err: %s\n",
 			     strerror(errno));
 		}
 	} else {
 		log_error_message
-		    ("AL Daemon Stop : Application %s cannot be stopped because is already stopped !\n",
+		    ("Stop : Application %s cannot be stopped because is already stopped !\n",
 		     l_commandLine);
 	}
 }
@@ -1688,38 +1726,38 @@ void StopAs(int p_pid, int p_euid, int p_egid)
 		/* low level command to systemd */
 		char l_cmd[DIM_MAX];
 		log_debug_message
-		    ("AL Daemon StopAs : %s stopped with stopas !\n",
+		    ("StopAs : %s stopped with stopas !\n",
 		     l_app_name);
 		/* form the systemd command line string */
 		sprintf(l_cmd, "systemctl stop %s.service", l_commandLine);
 		/* test ownership and rights before stopping application */
 		log_debug_message
-		    ("AL Daemon StopAs : Extracting ownership info for %s\n",
+		    ("StopAs : Extracting ownership info for %s\n",
 		     l_commandLine);
 		ExtractOwnershipInfo(l_user, l_group, l_srv_path);
 		log_debug_message
-		    ("AL Daemon StopAs : The ownership information was extracted properly [ user : %s ] and [ group : %s ]\n",
+		    ("StopAs : The ownership information was extracted properly [ user : %s ] and [ group : %s ]\n",
 		     l_user, l_group);
 		/* extract user name and group name from uid and gid */
 		if (MapUidToUser(p_euid, l_str_euid) != 0) {
 			log_error_message
-			    ("AL Daemon RunAs : Cannot map uid to user for %s\n",
+			    ("StopAs : Cannot map uid to user for %s\n",
 			     l_commandLine);
 			goto free_res;
 		}
 		if (MapGidToGroup(p_egid, l_str_egid) != 0) {
 			log_error_message
-			    ("AL Daemon RunAs : Cannot map gid to user for %s\n",
+			    ("StopAs : Cannot map gid to user for %s\n",
 			     l_commandLine);
 			goto free_res;
 		}
 		log_message
-		    ("AL Daemon StopAs : The input ownership information [ user: %s ] and [ group : %s ]\n",
+		    ("StopAs : The input ownership information [ user: %s ] and [ group : %s ]\n",
 		     l_str_euid, l_str_egid);
 		if ((strcmp(l_user, l_str_euid) != 0)
 		    && (strcmp(l_group, l_str_egid) != 0)) {
 			log_error_message
-			    ("AL Daemon StopAs : The current user doesn't have permissions to stopas %s!\n",
+			    ("StopAs : The current user doesn't have permissions to stopas %s!\n",
 			     l_commandLine);
 			goto free_res;
 		}
@@ -1727,13 +1765,13 @@ void StopAs(int p_pid, int p_euid, int p_egid)
 		l_ret = system(l_cmd);
 		if (l_ret != 0) {
 			log_error_message
-			    ("AL Daemon StopAs : Application cannot be stopped! Err:%s\n",
+			    ("StopAs : Application cannot be stopped! Err:%s\n",
 			     strerror(errno));
 		    goto free_res;
 		}
 	} else {
 		log_error_message
-		    ("AL Daemon StopAs : Application %s cannot be stopped because is already stopped !\n",
+		    ("StopAs : Application %s cannot be stopped because is already stopped !\n",
 		     l_commandLine);
 		return;
 	}
@@ -1753,15 +1791,15 @@ free_res:
 void TaskStarted(int p_pid, char *p_imagePath)
 {
 	log_debug_message
-	    ("AL Daemon TaskStarted Signal : Task %d %s was started and signal %s was emitted!\n",
-	     p_pid, p_imagePath, AL_SIGNAME_TASK_STARTED);
+	    ("TaskStarted Signal : Task %d %s was started and signal %s was emitted!\n",
+	     &p_pid, p_imagePath, AL_SIGNAME_TASK_STARTED);
 }
 
 void TaskStopped(int p_pid, char *p_imagePath)
 {
 	log_debug_message
-	    ("AL Daemon TaskStopped Signal : Task %d %s was stopped and signal %s was emitted!\n",
-	     p_pid, p_imagePath, AL_SIGNAME_TASK_STOPPED);
+	    ("TaskStopped Signal : Task %d %s was stopped and signal %s was emitted!\n",
+	     &p_pid, p_imagePath, AL_SIGNAME_TASK_STOPPED);
 }
 
 void ChangeTaskState(int p_pid, bool p_isFg)
@@ -1773,7 +1811,7 @@ void ChangeTaskState(int p_pid, bool p_isFg)
 		strcpy(l_flag, "background");
 	/* change the state of the application given by pid */
 	log_debug_message
-	    ("AL Daemon ChangeTaskState : Application with pid %d changed state to %s \n",
+	    ("ChangeTaskState : Application with pid %d changed state to %s \n",
 	     p_pid, l_flag);
 }
 
@@ -1786,7 +1824,7 @@ void Restart(char *p_app_name)
 	int l_ret;
 	/* the command line for the application */
 	char l_cmd[DIM_MAX];
-	log_debug_message("AL Daemon Restart : %s will be restarted !\n",
+	log_debug_message("Restart : %s will be restarted !\n",
 			  p_app_name);
 	/* check if single service will be restarted */
 	if ((AppExistsInSystem(p_app_name)) == 1) {
@@ -1801,12 +1839,12 @@ void Restart(char *p_app_name)
 	if (l_ret != 0) {
 		if ((AppExistsInSystem(p_app_name)) == 1) {
 			log_error_message
-			    ("AL Daemon Restart : Application cannot be restarted with restart! Err: %s\n",
+			    ("Restart : Application cannot be restarted with restart! Err: %s\n",
 			     strerror(errno));
 		}
 		if ((AppExistsInSystem(p_app_name)) == 2) {
 			log_error_message
-			    ("AL Daemon Restart : Applications group cannot be restarted with restart! Err: %s\n",
+			    ("Restart : Applications group cannot be restarted with restart! Err: %s\n",
 			     strerror(errno));
 		}
 	}

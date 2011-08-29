@@ -89,6 +89,7 @@ GType al_dbus_get_type(void);
 gboolean al_dbus_run(
 		ALDbus *server,
 		gchar *command_line,
+		gint parent_pid,
 		gboolean foreground,
 		DBusGMethodInvocation *context
 );
@@ -96,6 +97,7 @@ gboolean al_dbus_run(
 gboolean al_dbus_run_as(
 		ALDbus *server,
 		gchar *command_line,
+		gint parent_pid,
 		gboolean foreground,
 		gint app_uid,
 		gint app_gid,
@@ -104,25 +106,25 @@ gboolean al_dbus_run_as(
 
 gboolean al_dbus_stop(
 		ALDbus *server,
-		guint app_pid,
+		gint app_pid,
 		DBusGMethodInvocation *context
 );
 
 gboolean al_dbus_resume(
 		ALDbus *server,
-		guint app_pid,
+		gint app_pid,
 		DBusGMethodInvocation *context
 );
 
 gboolean al_dbus_suspend(
 		ALDbus *server,
-		guint app_pid,
+		gint app_pid,
 		DBusGMethodInvocation *context
 );
 
 gboolean al_dbus_stop_as(
 		ALDbus *server,
-		guint app_pid,
+		gint app_pid,
 		gint app_uid,
 		gint app_gid,
 		DBusGMethodInvocation *context

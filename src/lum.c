@@ -56,41 +56,41 @@ void ExtractOwnershipInfo(char *p_euid, char *p_egid, char *p_file)
   /* local store of egid and euid */
   char *l_gid = malloc(DIM_MAX*sizeof(l_gid));
   char *l_uid = malloc(DIM_MAX*sizeof(l_uid));
-  log_debug_message("AL Daemon Unit File Parser : Creating new key file to support ownership info for %s \n", p_file);
+  log_debug_message("Unit File Parser : Creating new key file to support ownership info for %s \n", p_file);
   /* the created GKeyFile for the given file on disk */
   GKeyFile *l_out_new_key_file = g_key_file_new();
   if(!l_out_new_key_file) {
-	log_error_message("AL Daemon Unit File Parser : The key file cannot be created for %s \n", p_file);
+	log_error_message("Unit File Parser : The key file cannot be created for %s \n", p_file);
 	return;
   }
-  log_debug_message("AL Daemon Unit File Parser : Initialize the error for uid/gid extraction for %s \n", p_file);
+  log_debug_message("Unit File Parser : Initialize the error for uid/gid extraction for %s \n", p_file);
   /* initialize the error */
   GError *l_err = NULL;
-  log_debug_message("AL Daemon Unit File Parser : Load key file from disk for %s \n", p_file);
+  log_debug_message("Unit File Parser : Load key file from disk for %s \n", p_file);
   /* load key file structure from file on disk */
   if (!g_key_file_load_from_file
       (l_out_new_key_file, p_file, G_KEY_FILE_NONE, &l_err)) {
           if(NULL!=l_err){
               log_error_message
-	          ("AL Daemon Unit File Parser : Cannot load key structure from service unit key file! (%d: %s)\n",
+	          ("Unit File Parser : Cannot load key structure from service unit key file! (%d: %s)\n",
                    l_err->code, l_err->message);
               g_error_free(l_err);
           } else {
               log_error_message
-	          ("AL Daemon Unit File Parser : Cannot load key structure from service unit key file!%s\n", "");
+	          ("Unit File Parser : Cannot load key structure from service unit key file!%s\n", "");
           }
     g_key_file_free(l_out_new_key_file);
     return;
   }
-  log_debug_message("AL Daemon Unit File Parser : Extracting groups from key file structure for %s \n", p_file);
+  log_debug_message("Unit File Parser : Extracting groups from key file structure for %s \n", p_file);
   /* extract groups from key file structure */
   l_groups = g_key_file_get_groups(l_out_new_key_file, &l_groups_length);
   log_debug_message
-	("AL Daemon Ownership Info Extractor : Extracted groups from key file for %s \n",
+	("Ownership Info Extractor : Extracted groups from key file for %s \n",
 	 p_file);
   if (l_groups == NULL) {
     log_error_message
-	("AL Daemon Ownership Info Extractor : Could not retrieve groups from %s service unit file!\n",
+	("Ownership Info Extractor : Could not retrieve groups from %s service unit file!\n",
 	 p_file);
       g_key_file_free(l_out_new_key_file);
       return;
@@ -105,18 +105,18 @@ void ExtractOwnershipInfo(char *p_euid, char *p_egid, char *p_file)
 	g_key_file_get_keys(l_out_new_key_file, l_groups[l_i],
 			    &l_keys_length, &l_err);
     log_debug_message
-	("AL Daemon Ownership Info Extractor : Extracted keys from key file for %s \n",
+	("Ownership Info Extractor : Extracted keys from key file for %s \n",
 	 p_file);
     /* check if the file is properly structured */
     if (l_keys == NULL) {
         if(NULL!=l_err){
             log_error_message
-	        ("al daemon ownership info extractor : error in retrieving keys in service unit file! (%d: %s)", 
+	        ("Ownership Info Extractor : error in retrieving keys in service unit file! (%d: %s)", 
                  l_err->code, l_err->message);
             g_error_free(l_err);
         } else {
             log_error_message
-	        ("al daemon ownership info extractor : error in retrieving keys in service unit file!%s", "");
+	        ("Ownership Info Extractor : error in retrieving keys in service unit file!%s", "");
         }
     } else {
       unsigned long l_j;
@@ -137,25 +137,25 @@ void ExtractOwnershipInfo(char *p_euid, char *p_egid, char *p_file)
 	if (l_str_value == NULL) {
             if(NULL!=l_err){
                 log_error_message
-                    ("AL Daemon Ownership Info Extractor : Error retrieving key's value in service unit file. (%d, %s)\n",
+                    ("Ownership Info Extractor : Error retrieving key's value in service unit file. (%d, %s)\n",
                      l_err->code, l_err->message);
                 g_error_free(l_err);
             } else {
                 log_error_message
-                    ("AL Daemon Ownership Info Extractor : Error retrieving key's value in service unit file.%s\n", "");
+                    ("Ownership Info Extractor : Error retrieving key's value in service unit file.%s\n", "");
             }
 	}
       }
     }
   }
   /* the extracted ownership values */
-  log_debug_message("AL Daemon Ownership Info Extractor : Preparing keys to be returned for %s \n",
+  log_debug_message("Ownership Info Extractor : Preparing keys to be returned for %s \n",
 	 p_file);
   strcpy(p_egid, l_gid);
-  log_debug_message("AL Daemon Ownership Info Extractor : Extracted keys from key file for %s \n",
+  log_debug_message("Ownership Info Extractor : Extracted keys from key file for %s \n",
 	 p_file);
   strcpy(p_euid, l_uid);
-  log_debug_message("AL Daemon Ownership Info Extractor : Extracted keys from key file for %s \n",
+  log_debug_message("Ownership Info Extractor : Extracted keys from key file for %s \n",
 	 p_file);
   if(l_out_new_key_file) g_key_file_free(l_out_new_key_file);
 }
@@ -168,12 +168,12 @@ int MapUidToUser(int p_uid, char *p_user){
   uid_t l_uid = (uid_t)p_uid;
   /* check id existence */
   if ((l_pwd = getpwuid(p_uid))==NULL){
-         log_error_message("AL Daemon UID to User Mapper : UID %d is not associated with any existing user !\n", p_uid);
+         log_error_message("UID to User Mapper : UID %d is not associated with any existing user !\n", p_uid);
 	 return -1;
 	 }
   /* extract the user from the structure */
   strcpy(p_user, l_pwd->pw_name);
-  log_debug_message("AL Daemon UID to User Mapper : uid=%d(%s) \n", p_uid, p_user);
+  log_debug_message("UID to User Mapper : uid=%d(%s) \n", p_uid, p_user);
   return 0;
 }
 
@@ -185,12 +185,12 @@ int MapGidToGroup(int p_gid, char *p_group){
   gid_t l_gid = (gid_t)p_gid;
   /* check group */
   if ((l_gp = getgrgid(l_gid))==NULL){
-	log_error_message("AL Daemon GID to User Mapper : GID %d is not associated with any existing group !\n", p_gid);
+	log_error_message("GID to User Mapper : GID %d is not associated with any existing group !\n", p_gid);
 	return -1;	
 	}
   /* extract guid information */
   strcpy(p_group, l_gp->gr_name);
-  log_debug_message("AL Daemon GID to Group Mapper : gid=%d(%s) \n", p_gid, p_group);
+  log_debug_message("GID to Group Mapper : gid=%d(%s) \n", p_gid, p_group);
   return 0;
 }
 
@@ -211,23 +211,23 @@ int GetCurrentUser(GConfClient* p_client, GConfEntry *p_key, char *p_user)
   char *l_usr;
   /* get key and test for errors */
   if ((l_key = gconf_entry_get_key(p_key)) == NULL) {
-    log_error_message("AL Daemon Get Current User : Cannot acces current user key !\n", 0);
+    log_error_message("Get Current User : Cannot acces current user key !\n", 0);
     return 0; 
   }
   /* get the current user and check for errors */
   if((l_str_val = gconf_client_get_string(p_client, l_key, &l_err)) == NULL){
     if(NULL!=l_err){
-      log_error_message("AL Daemon Get Current User : The current user key has invalid content! Err : %s\n",l_err->message);
+      log_error_message("Get Current User : The current user key has invalid content! Err : %s\n",l_err->message);
       g_error_free(l_err);
     } else {
-      log_error_message("AL Daemon Get Current User : The current user key has invalid content!%s\n","");
+      log_error_message("Get Current User : The current user key has invalid content!%s\n","");
     }
       return 0;
    } 
   /* to make the user name available when returning */
   l_usr = strdup(l_str_val);
   strcpy(p_user, l_usr);
-  log_debug_message("AL Daemon Get Current User : The current user is USER=%s\n", p_user);
+  log_debug_message("Get Current User : The current user is USER=%s\n", p_user);
   return 1;
 }
 
@@ -245,15 +245,15 @@ int StartUserModeApps(GConfClient *p_client, char *p_user)
   /* current entry in application list */
   char *l_app;
   /* pid for currently started application in the list */
-  int l_app_pid;
+  int *l_app_pid;
   /* test user existence in gconftree file */
   if(p_user==NULL){
-	log_error_message("AL Daemon Start User Mode Apps : The gconftree file doesn't exist or the user was not created !\n Skipping last user mode application startup !\n", 0);
+	log_error_message("Start User Mode Apps : The gconftree file doesn't exist or the user was not created !\n Skipping last user mode application startup !\n", 0);
 	goto free_res;
   }
   /* test client validity */
   if(p_client==NULL){
-	log_error_message("AL Daemon Start User Mode Apps : The gconf client is not valid !\n Skipping last user mode application startup !\n", 0);
+	log_error_message("Start User Mode Apps : The gconf client is not valid !\n Skipping last user mode application startup !\n", 0);
 	goto free_res;
   }
   /* form the specific last_mode key for user */
@@ -264,10 +264,10 @@ int StartUserModeApps(GConfClient *p_client, char *p_user)
   if((l_app_list = gconf_client_get_list(p_client, (gchar*)l_last_mode_key, GCONF_VALUE_STRING, &l_err)) == NULL){
         /* test if list is empty */
         if((gconf_client_get(p_client, (gchar*)l_last_mode_key, NULL)) == NULL){
-		log_error_message("AL Daemon Start User Mode Apps : Application list for current user mode is empty !%s\n", (NULL!=l_err?l_err->message:""));
+		log_error_message("Start User Mode Apps : Application list for current user mode is empty !%s\n", (NULL!=l_err?l_err->message:""));
 		goto free_res;
         }else{
-	 	log_error_message("AL Daemon Start User Mode Apps : Cannot get list from current user key !%s\n", (NULL!=l_err?l_err->message:""));
+	 	log_error_message("Start User Mode Apps : Cannot get list from current user key !%s\n", (NULL!=l_err?l_err->message:""));
 		goto free_res;
         }
      }
@@ -276,10 +276,10 @@ int StartUserModeApps(GConfClient *p_client, char *p_user)
 	 /* get app name */
 	 l_app = (char*)g_slist_nth_data(l_app_list, l_idx);
          /* run application */
- 	 Run(l_app, 0, TRUE, l_app_pid);
-	 log_debug_message("AL Daemon Start User Mode Apps : Started %s for user %s !\n", l_app, p_user);
+ 	 Run(l_app, 0, TRUE);
+	 log_debug_message("Start User Mode Apps : Started %s for user %s !\n", l_app, p_user);
   }
-  log_debug_message("AL Daemon Start User Mode Apps : Last user mode applications for user %s was setup!\n", p_user);
+  log_debug_message("Start User Mode Apps : Last user mode applications for user %s was setup!\n", p_user);
    g_slist_free(l_app_list);
    return 1;
 free_res:
@@ -304,24 +304,24 @@ int InitializeLastUserMode()
   g_type_init();
   /* create a new GConfClient object using the default settings. */
   if(((l_client = gconf_client_get_default()) == NULL)){
-    log_error_message("AL Daemon Last User Mode Init : Failed to create client for last-user-mode!\n", 0);
+    log_error_message("Last User Mode Init : Failed to create client for last-user-mode!\n", 0);
     goto free_res;
   }
   /* extract entry */
   if((l_current_user_key = gconf_client_get_entry(l_client, AL_GCONF_CURRENT_USER_KEY, NULL, FALSE, &l_error)) ==  NULL){
-	log_error_message("AL Daemon Last User Mode Init : Failed to get entry for current user key ! %s!\n",
+	log_error_message("Last User Mode Init : Failed to get entry for current user key ! %s!\n",
             l_error->message);
     	g_clear_error(&l_error);
 	goto free_res;
   }
   /* get the current value for the current_user key */
   if(!GetCurrentUser(l_client, l_current_user_key, l_current_user)){
-  		log_error_message("AL Daemon Last User Mode Init : Cannot extract current user !\n", 0);
+  		log_error_message("Last User Mode Init : Cannot extract current user !\n", 0);
  		goto free_res;
   }
   /* start current user mode applications */
   if(!StartUserModeApps(l_client, l_current_user)){
-	log_error_message("AL Daemon Last User Mode Init : Cannot start user mode applications !\n", 0);
+	log_error_message("Last User Mode Init : Cannot start user mode applications !\n", 0);
 		goto free_res;
   }
    g_object_unref(l_client) ;
