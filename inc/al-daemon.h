@@ -34,7 +34,7 @@
 #define AL_SIGNAME_TASK_STOPPED "TaskStopped"
 #define AL_SIGNAME_NOTIFICATION "GlobalStateNotification"
 #define DIM_MAX 200
-#define AL_VERSION "1.6"
+#define AL_VERSION "2.0"
 #define AL_GCONF_CURRENT_USER_KEY "/current_user"
 #define AL_GCONF_LAST_USER_MODE_KEY "/last_mode"
 #define AL_PID_FILE "/var/run/al-daemon.pid"
