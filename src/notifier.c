@@ -293,15 +293,6 @@ free_res:
   /* free the error */
   dbus_error_free(&l_error);
 
-  if (l_ls_state)
-          free(l_ls_state);
-  if (l_as_state)
-          free(l_as_state);
-  if (l_ss_state)
-          free(l_ss_state);
-  if (l_path)
-          free(l_path);
-
   return l_ret;
 }
 
@@ -552,8 +543,9 @@ free_res:
   if(l_app_name) free(l_app_name);
   if(l_service_name) free(l_service_name);
   if(l_state_msg) free(l_state_msg);
-  /* free the error */
-  dbus_error_free(&l_err);
+  if(dbus_error_is_set(&l_err))
+    /* free the error */
+    dbus_error_free(&l_err);
   /* free unit object path string */
   if (NULL != l_path)
           free(l_path);

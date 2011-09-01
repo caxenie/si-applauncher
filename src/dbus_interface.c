@@ -311,8 +311,6 @@ gboolean al_dbus_run(ALDbus * server,
 	int l_new_pid;
 	/* additional parameter processing and handling */
 	char *command_line_copy = malloc(sizeof(command_line));
-	/* used when extracting the deferred execution time */
-	char *command_line_deferred = malloc(sizeof(command_line));
 	/* time until deferred triggering */
 	char *l_time = NULL;
 	/* app state info container */
@@ -335,6 +333,8 @@ gboolean al_dbus_run(ALDbus * server,
 	/* check command line name for deferred binaries */
 	if ((strstr(command_line, "reboot") != NULL)
 	    || (strstr(command_line, "poweroff") != NULL)) {
+		/* used when extracting the deferred execution time */
+		char *command_line_deferred = malloc(sizeof(command_line));
 		/* make a copy of the string because will be altered */
 		strcpy(command_line_copy, command_line);
 		/* throw away the reboot/poweroff command name */
@@ -343,6 +343,9 @@ gboolean al_dbus_run(ALDbus * server,
 		l_time = strtok(NULL, " ");
 		/* restore the command string for future use */
 		strcpy(command_line, command_line_copy);
+		/* free aux string */
+		free(command_line_deferred);
+		command_line_deferred = NULL;
 	}
 	log_debug_message("Method Call Listener : Run app: %s\n",
 			  command_line);
@@ -357,13 +360,18 @@ gboolean al_dbus_run(ALDbus * server,
 	}
 
 	/* check for application service file existence */
-	if (!AppExistsInSystem(command_line)) {
+	if (AppExistsInSystem(command_line)==0) {
 		log_error_message
 		    ("Method Call Listener : Cannot run %s !\n Application %s is not found in the system !\n",
 		     command_line, command_line);
-		l_new_pid = (int)AppPidFromName(command_line);
+			/* resources free */
+		if(command_line_copy){
+			free(command_line_copy);
+			command_line_copy = NULL;
+		}
+		l_new_pid = 0;
 		dbus_g_method_return(context, l_new_pid);
-		return success;
+		goto free_res;
 	} else {
 		if ((l_r = (int)AppPidFromName(command_line)) != 0) {
 			log_error_message
@@ -374,12 +382,13 @@ gboolean al_dbus_run(ALDbus * server,
 			/* make a copy of the name to avoid additional postfix when calling run */
 			/* concatenate the appropiate string according the unit type i.e. service/target */
 			if (AppExistsInSystem(command_line) == 1) {
+				log_debug_message("Unit %s is service\n", command_line);
 				strcpy(command_line_copy, command_line);
 				if (AlGetAppState
 				    (l_conn,
 				     strcat(command_line_copy, ".service"),
 				     l_state_info) == 0) {
-
+					log_debug_message("Fetched state for service %s \n", command_line);
 					/* copy the state */
 					l_state_info_copy =
 					    strdup(l_state_info);
@@ -400,14 +409,25 @@ gboolean al_dbus_run(ALDbus * server,
 					l_sub_state =
 					    strtok(NULL, l_delim_serv);
 				}
-			}
-			if (AppExistsInSystem(command_line) == 2) {
+				else {
+					log_error_message("Failed to fetch app state for service %s\n", command_line);
+						/* resources free */
+					if(command_line_copy){
+						free(command_line_copy);
+						command_line_copy = NULL;
+					}
+					l_new_pid = (int)AppPidFromName(command_line);
+					dbus_g_method_return(context, l_new_pid);
+					goto free_res;
+				}
+			}else if (AppExistsInSystem(command_line) == 2) {
+				log_debug_message("Unit %s is target\n", command_line);
 				strcpy(command_line_copy, command_line);
 				if (AlGetAppState
 				    (l_conn,
 				     strcat(command_line_copy, ".target"),
 				     l_state_info) == 0) {
-
+					log_debug_message("Fetched state for target %s \n", command_line);
 					/* copy the state */
 					l_state_info_copy =
 					    strdup(l_state_info);
@@ -427,21 +447,44 @@ gboolean al_dbus_run(ALDbus * server,
 					l_sub_state =
 					    strtok(NULL, l_delim_serv);
 				}
+			 	else {
+					log_error_message("Failed to fetch app state for target %s\n", command_line);
+						/* resources free */
+					if(command_line_copy){
+						free(command_line_copy);
+						command_line_copy = NULL;
+					}
+					l_new_pid = (int)AppPidFromName(command_line);
+					dbus_g_method_return(context, l_new_pid);
+					goto free_res;
+				}
+			} else {
+				log_error_message("Invalid unit state for %s\n", command_line);
+						/* resources free */
+					if(command_line_copy){
+						free(command_line_copy);
+						command_line_copy = NULL;
+					}
+					l_new_pid = (int)AppPidFromName(command_line);
+					dbus_g_method_return(context, l_new_pid);
+					goto free_res;
 			}
-
+			log_debug_message("Test complete active state for service %s \n", command_line);
 			if (strcmp(l_active_state, "active") == 0) {
 				if ((strcmp(l_sub_state, "exited") != 0)
 				    || (strcmp(l_sub_state, "dead") != 0)
 				    || (strcmp(l_sub_state, "failed") != 0)) {
 					log_error_message
 					    ("Method Call Listener : Cannot run %s !\n Application/application group %s is already running in the system !\n", command_line, command_line);
-					l_new_pid = (int)AppPidFromName(command_line);
-					dbus_g_method_return(context, l_new_pid);
-					return success;
 				}
-			}
 		}
-	}
+		log_debug_message("Freeing the resources if the app %s is already running ... \n", command_line);
+		l_new_pid = (int)AppPidFromName(command_line);
+		dbus_g_method_return(context, l_new_pid);
+		goto free_res;
+	       }
+        }
+	log_debug_message("Preparing to start application %s \n", command_line);
 	/* ensure proper load state for the unit before starting it */
 	char *l_service_path = NULL;
 	/* temp to store full service name */
@@ -462,6 +505,9 @@ gboolean al_dbus_run(ALDbus * server,
 		dbus_g_method_return(context, l_new_pid);
 		goto free_res;
 	}
+	/* free full service name string */
+	if(l_full_srv)
+		free(l_full_srv);
 	/* setup foreground property in systemd and wait for reply */
 	if (SetupApplicationStartupState(l_conn, command_line, foreground) != 0) {
 		log_error_message
@@ -476,24 +522,8 @@ gboolean al_dbus_run(ALDbus * server,
 	dbus_g_method_return(context, l_new_pid);
 
 free_res:
-	/* resources free */
-	if(command_line_copy)
-		free(command_line_copy);
-	if(command_line_deferred)
-		free(command_line_deferred);
-	if(l_active_state)
-		free(l_active_state);
-	if(l_sub_state)
-		free(l_sub_state);
-	if(l_full_srv)
-		free(l_full_srv);
-	if(l_state_info_copy)
-		free(l_state_info_copy);
-	if(l_time)
-		free(l_time);
 	if (l_err)
 		g_error_free(l_err);
-
 	return success;
 
 }
@@ -537,6 +567,8 @@ gboolean al_dbus_run_as(ALDbus * server,
 	/* check command line name for deferred binaries */
 	if ((strstr(command_line, "reboot") != NULL)
 	    || (strstr(command_line, "poweroff") != NULL)) {
+		/* used when extracting the deferred execution time */
+		char *command_line_deferred = malloc(sizeof(command_line));
 		/* make a copy of the string because will be altered */
 		strcpy(command_line_copy, command_line);
 		/* throw away the reboot/poweroff command name */
@@ -545,6 +577,9 @@ gboolean al_dbus_run_as(ALDbus * server,
 		l_time = strtok(NULL, " ");
 		/* restore the command string for future use */
 		strcpy(command_line, command_line_copy);
+		/* free aux string */
+		free(command_line_deferred);
+		command_line_deferred = NULL;
 	}
 	log_debug_message("Method Call Listener : RunAs app: %s\n",
 			  command_line);
@@ -559,10 +594,15 @@ gboolean al_dbus_run_as(ALDbus * server,
 	}
 
 	/* check for application service file existence */
-	if (!AppExistsInSystem(command_line)) {
+	if (AppExistsInSystem(command_line)==0) {
 		log_error_message
 		    ("Method Call Listener : Cannot runas %s !\n Application %s is not found in the system !\n",
 		     command_line, command_line);
+			/* resources free */
+		if(command_line_copy){
+			free(command_line_copy);
+			command_line_copy = NULL;
+		}
 		l_new_pid = 0;
 		dbus_g_method_return(context, l_new_pid);
 		goto free_res;
@@ -576,12 +616,13 @@ gboolean al_dbus_run_as(ALDbus * server,
 			/* make a copy of the name to avoid additional postfix when calling run */
 			/* concatenate the appropiate string according the unit type i.e. service/target */
 			if (AppExistsInSystem(command_line) == 1) {
+				log_debug_message("Unit %s is service\n", command_line);
 				strcpy(command_line_copy, command_line);
 				if (AlGetAppState
 				    (l_conn,
 				     strcat(command_line_copy, ".service"),
 				     l_state_info) == 0) {
-
+					log_debug_message("Fetched state for service %s \n", command_line);
 					/* copy the state */
 					l_state_info_copy =
 					    strdup(l_state_info);
@@ -602,14 +643,25 @@ gboolean al_dbus_run_as(ALDbus * server,
 					l_sub_state =
 					    strtok(NULL, l_delim_serv);
 				}
-			}
-			if (AppExistsInSystem(command_line) == 2) {
+				else {
+					log_error_message("Failed to fetch app state for service %s\n", command_line);
+						/* resources free */
+					if(command_line_copy){
+						free(command_line_copy);
+						command_line_copy = NULL;
+					}
+					l_new_pid = (int)AppPidFromName(command_line);
+					dbus_g_method_return(context, l_new_pid);
+					goto free_res;
+				}
+			}else if (AppExistsInSystem(command_line) == 2) {
+				log_debug_message("Unit %s is target\n", command_line);
 				strcpy(command_line_copy, command_line);
 				if (AlGetAppState
 				    (l_conn,
 				     strcat(command_line_copy, ".target"),
 				     l_state_info) == 0) {
-
+					log_debug_message("Fetched state for target %s \n", command_line);
 					/* copy the state */
 					l_state_info_copy =
 					    strdup(l_state_info);
@@ -629,22 +681,44 @@ gboolean al_dbus_run_as(ALDbus * server,
 					l_sub_state =
 					    strtok(NULL, l_delim_serv);
 				}
+			 	else {
+					log_error_message("Failed to fetch app state for target %s\n", command_line);
+						/* resources free */
+					if(command_line_copy){
+						free(command_line_copy);
+						command_line_copy = NULL;
+					}
+					l_new_pid = (int)AppPidFromName(command_line);
+					dbus_g_method_return(context, l_new_pid);
+					goto free_res;
+				}
+			} else {
+				log_error_message("Invalid unit state for %s\n", command_line);
+						/* resources free */
+					if(command_line_copy){
+						free(command_line_copy);
+						command_line_copy = NULL;
+					}
+					l_new_pid = (int)AppPidFromName(command_line);
+					dbus_g_method_return(context, l_new_pid);
+					goto free_res;
 			}
-
+			log_debug_message("Test complete active state for service %s \n", command_line);
 			if (strcmp(l_active_state, "active") == 0) {
 				if ((strcmp(l_sub_state, "exited") != 0)
 				    || (strcmp(l_sub_state, "dead") != 0)
 				    || (strcmp(l_sub_state, "failed") != 0)) {
 					log_error_message
-					    ("Method Call Listener : Cannot runas %s !\n Application/application group %s is already running in the system !\n",
-					     command_line, command_line);
-					l_new_pid = (int)AppPidFromName(command_line);
-					dbus_g_method_return(context, l_new_pid);
-					goto free_res;
+					    ("Method Call Listener : Cannot run %s !\n Application/application group %s is already running in the system !\n", command_line, command_line);
 				}
-			}
 		}
-	}
+		log_debug_message("Freeing the resources if the app %s is already running ... \n", command_line);
+		l_new_pid = (int)AppPidFromName(command_line);
+		dbus_g_method_return(context, l_new_pid);
+		goto free_res;
+	       }
+        }
+	log_debug_message("Preparing to start application %s \n", command_line);
 	/* ensure proper load state for the unit before starting it */
 	char *l_service_path = NULL;
 	/* temp to store full service name */
@@ -666,6 +740,9 @@ gboolean al_dbus_run_as(ALDbus * server,
 		dbus_g_method_return(context, l_new_pid);
 		goto free_res;
 	}
+	/* free the full service name string */
+	if(l_full_srv)
+		free(l_full_srv);
 	log_debug_message("Called RunAs : [ %s | %s | %d | %d ]\n", command_line,
 		    (foreground == TRUE) ? "true" : "false", app_uid, app_gid);
 	RunAs(command_line, parent_pid, foreground, app_uid, app_gid);
@@ -683,10 +760,6 @@ gboolean al_dbus_run_as(ALDbus * server,
 	dbus_g_method_return(context, l_new_pid);
 
 free_res:
-	if(command_line_copy)
-		free(command_line_copy);
-	if(command_line_deferred)
-		free(command_line_deferred);
 	if (l_err)
 		g_error_free(l_err);
 
@@ -729,11 +802,15 @@ gboolean al_dbus_stop(ALDbus * server,
 			log_error_message
 			    ("Method Call Listener : Cannot stop %s !\n Application %s is not found in the system !\n",
 			     l_app, l_app);
+			dbus_g_method_return(context);
 			goto free_res;
 		}
-		log_error_message
+	   log_error_message
 		    ("Method Call Listener : Cannot stop %s !\n",
 		     l_app);
+	   dbus_g_method_return(context);
+	   goto free_res;
+	}
 		/* check the application current state before stopping it */
 		/* extract the application state for testing existence */
 		/* make a copy of the name to avoid additional postfix when calling stop */
@@ -753,9 +830,7 @@ gboolean al_dbus_stop(ALDbus * server,
 				l_active_state = strtok(NULL, l_delim_serv);
 				l_sub_state = strtok(NULL, l_delim_serv);
 			}
-		}
-		/* test if the unit is a target and react according to type */
-		if (AppExistsInSystem(l_app) == 2) {
+		} else if (AppExistsInSystem(l_app) == 2) {
 			strcpy(l_app_copy, l_app);
 			if (AlGetAppState
 			    (l_conn, strcat(l_app_copy, ".target"),
@@ -770,6 +845,10 @@ gboolean al_dbus_stop(ALDbus * server,
 				l_active_state = strtok(NULL, l_delim_serv);
 				l_sub_state = strtok(NULL, l_delim_serv);
 			}
+		} else {
+			log_error_message("Cannot determine unit type and cannot extract state\n", 0);
+			dbus_g_method_return(context);
+		        goto free_res;
 		}
 		/* state testing */
 		if ((strcmp(l_active_state, "active") != 0)
@@ -779,9 +858,9 @@ gboolean al_dbus_stop(ALDbus * server,
 			log_error_message
 			    ("AL Daemon Method Call Listener : Cannot stop %s !\n Application %s is already stopped !\n",
 			     l_app, l_app);
+			dbus_g_method_return(context);
 			goto free_res;
 		}
-	}
 	/* test if we have a service that will be stopped */
 	if ((AppExistsInSystem(l_app)) == 1) {
 		/* maintains the command line to pass to systemd */
@@ -800,6 +879,7 @@ gboolean al_dbus_stop(ALDbus * server,
 			log_error_message
 			    ("Method Call Listener : Cannot stop %s !\n Application %s is already stopped !\n",
 			     l_app, l_app);
+			dbus_g_method_return(context);
 			goto free_res;
 		}
 		dbus_g_method_return(context);
@@ -814,6 +894,7 @@ gboolean al_dbus_stop(ALDbus * server,
 			log_error_message
 			    ("Method Call Listener : Cannot stop %s !\n Application group %s is already stopped !\n",
 			     l_app, l_app);
+			dbus_g_method_return(context);
 			goto free_res;
 		}
 		dbus_g_method_return(context);
@@ -823,10 +904,8 @@ gboolean al_dbus_stop(ALDbus * server,
 free_res:
 	if(l_app)
 		free(l_app);
-	if(l_app_copy)	
+	if(l_app_copy)
 		free(l_app_copy);
-
-	dbus_g_method_return(context);
 
 	return success;
 
@@ -889,8 +968,10 @@ gboolean al_dbus_resume(ALDbus * server,
 			l_active_state = strtok(NULL, l_delim_serv);
 			l_sub_state = strtok(NULL, l_delim_serv);
 
+		} else {
+			log_error_message("Cannot extract unit information\n", 0);
+			goto free_res;
 		}
-
 		if (strcmp(l_active_state, "active") == 0) {
 			if ((strcmp(l_sub_state, "exited") != 0)
 			    || (strcmp(l_sub_state, "dead") != 0)
@@ -908,7 +989,7 @@ gboolean al_dbus_resume(ALDbus * server,
 free_res:
 	if(l_app)
 		free(l_app);
-	if(l_app_copy)	
+	if(l_app_copy)
 		free(l_app_copy);
 
 	dbus_g_method_return(context);
@@ -974,6 +1055,9 @@ gboolean al_dbus_suspend(ALDbus * server,
 			l_active_state = strtok(NULL, l_delim_serv);
 			l_sub_state = strtok(NULL, l_delim_serv);
 
+		} else {
+			log_error_message("Cannot extract unit information\n", 0);
+			goto free_res;
 		}
 
 		if ((strcmp(l_active_state, "active") != 0)
@@ -993,7 +1077,7 @@ gboolean al_dbus_suspend(ALDbus * server,
 free_res:
 	if(l_app)
 		free(l_app);
-	if(l_app_copy)	
+	if(l_app_copy)
 		free(l_app_copy);
 
 	dbus_g_method_return(context);
@@ -1060,6 +1144,9 @@ gboolean al_dbus_stop_as(ALDbus * server,
 			l_active_state = strtok(NULL, l_delim_serv);
 			l_sub_state = strtok(NULL, l_delim_serv);
 
+		} else {
+			log_error_message("Cannot extract unit information\n", 0);
+			goto free_res;
 		}
 		/* state testing */
 		if ((strcmp(l_active_state, "active") != 0)
@@ -1081,7 +1168,7 @@ gboolean al_dbus_stop_as(ALDbus * server,
 free_res:
 	if(l_app)
 		free(l_app);
-	if(l_app_copy)	
+	if(l_app_copy)
 		free(l_app_copy);
 	if(l_app_status)
 		free(l_app_status);
@@ -1334,7 +1421,7 @@ static DBusHandlerResult al_dbus_signal_filter(DBusConnection *connection, DBusM
 		        /* send global state notification signal */
 			AlAppStateNotifier(l_conn, id);
 			/* send task started/stopped signal */
-			AlSendAppSignal(l_conn, id);	
+			AlSendAppSignal(l_conn, id);
                 }
         }
 	/* if erroneous exit deallocate resources */
