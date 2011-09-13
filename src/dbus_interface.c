@@ -310,6 +310,8 @@ gboolean al_dbus_run(ALDbus * server,
 	int l_new_pid;
 	/* additional parameter processing and handling */
 	char *command_line_copy = malloc(sizeof(command_line));
+	/* used when extracting the deferred execution time */
+	char *command_line_deferred = malloc(sizeof(command_line));
 	/* time until deferred triggering */
 	char *l_time = NULL;
 	/* app state info container */
@@ -332,8 +334,6 @@ gboolean al_dbus_run(ALDbus * server,
 	/* check command line name for deferred binaries */
 	if ((strstr(command_line, "reboot") != NULL)
 	    || (strstr(command_line, "poweroff") != NULL)) {
-		/* used when extracting the deferred execution time */
-		char *command_line_deferred = malloc(sizeof(command_line));
 		/* make a copy of the string because will be altered */
 		strcpy(command_line_copy, command_line);
 		/* throw away the reboot/poweroff command name */
@@ -342,12 +342,6 @@ gboolean al_dbus_run(ALDbus * server,
 		l_time = strtok(NULL, " ");
 		/* restore the command string for future use */
 		strcpy(command_line, command_line_copy);
-		/* free aux string */
-		free(command_line_deferred);
-		command_line_deferred = NULL;
-	}
-	log_debug_message("Method Call Listener : Run app: %s\n",
-			  command_line);
 	/* if reboot / shutdown unit add deferred functionality in timer file */
 	if (strstr(command_line, "reboot") != NULL) {
 		SetupUnitFileKey("/lib/systemd/system/reboot.timer",
@@ -356,8 +350,8 @@ gboolean al_dbus_run(ALDbus * server,
 	if (strstr(command_line, "poweroff") != NULL) {
 		SetupUnitFileKey("/lib/systemd/system/poweroff.timer",
 				 "OnActiveSec", l_time, "poweroff");
-	}
-
+		}
+        }
 	/* check for application service file existence */
 	if (AppExistsInSystem(command_line)==0) {
 		log_error_message
@@ -489,7 +483,10 @@ gboolean al_dbus_run(ALDbus * server,
 	/* temp to store full service name */
 	char *l_full_srv = malloc(sizeof(l_state_info));
 	strcpy(l_full_srv, command_line);
-	strcat(l_full_srv, ".service");
+	if ((strstr(command_line, "reboot") != NULL)
+	    || (strstr(command_line, "poweroff") != NULL)) {
+				strcat(l_full_srv, ".timer");
+	} else strcat(l_full_srv, ".service");
 	/* load unit info */
 	if (!dbus_g_proxy_call(sysd_proxy,
 			       "LoadUnit",
@@ -523,6 +520,11 @@ gboolean al_dbus_run(ALDbus * server,
 free_res:
 	if (l_err)
 		g_error_free(l_err);
+	/* free aux string */
+	if(command_line_deferred){
+		free(command_line_deferred);
+		command_line_deferred = NULL;
+	  }
 	return success;
 
 }
@@ -566,8 +568,6 @@ gboolean al_dbus_run_as(ALDbus * server,
 	/* check command line name for deferred binaries */
 	if ((strstr(command_line, "reboot") != NULL)
 	    || (strstr(command_line, "poweroff") != NULL)) {
-		/* used when extracting the deferred execution time */
-		char *command_line_deferred = malloc(sizeof(command_line));
 		/* make a copy of the string because will be altered */
 		strcpy(command_line_copy, command_line);
 		/* throw away the reboot/poweroff command name */
@@ -576,12 +576,6 @@ gboolean al_dbus_run_as(ALDbus * server,
 		l_time = strtok(NULL, " ");
 		/* restore the command string for future use */
 		strcpy(command_line, command_line_copy);
-		/* free aux string */
-		free(command_line_deferred);
-		command_line_deferred = NULL;
-	}
-	log_debug_message("Method Call Listener : RunAs app: %s\n",
-			  command_line);
 	/* if reboot / shutdown unit add deferred functionality in timer file */
 	if (strstr(command_line, "reboot") != NULL) {
 		SetupUnitFileKey("/lib/systemd/system/reboot.timer",
@@ -590,8 +584,8 @@ gboolean al_dbus_run_as(ALDbus * server,
 	if (strstr(command_line, "poweroff") != NULL) {
 		SetupUnitFileKey("/lib/systemd/system/poweroff.timer",
 				 "OnActiveSec", l_time, "poweroff");
+		}
 	}
-
 	/* check for application service file existence */
 	if (AppExistsInSystem(command_line)==0) {
 		log_error_message
@@ -723,7 +717,10 @@ gboolean al_dbus_run_as(ALDbus * server,
 	/* temp to store full service name */
 	char *l_full_srv = malloc(sizeof(l_state_info));
 	strcpy(l_full_srv, command_line);
-	strcat(l_full_srv, ".service");
+	if ((strstr(command_line, "reboot") != NULL)
+	    || (strstr(command_line, "poweroff") != NULL)) {
+				strcat(l_full_srv, ".timer");
+	} else strcat(l_full_srv, ".service");
 	/* load unit info */
 	if (!dbus_g_proxy_call(sysd_proxy,
 			       "LoadUnit",
@@ -761,7 +758,11 @@ gboolean al_dbus_run_as(ALDbus * server,
 free_res:
 	if (l_err)
 		g_error_free(l_err);
-
+	/* free aux string */
+	if(command_line_deferred){
+		free(command_line_deferred);
+		command_line_deferred = NULL;
+	  }
 	return success;
 }
 
