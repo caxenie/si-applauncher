@@ -49,7 +49,6 @@
 #include "notifier.h"
 #include "al-daemon.h"
 #include "al_dbus-glue.h"
-#include "global_notif_custom_marshaller.c"
 #include "task_info_custom_marshaller.c"
 #include "task_state_change_custom_marshaller.c"
 
