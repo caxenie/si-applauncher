@@ -24,7 +24,6 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <gconf/gconf-client.h>
 #include <getopt.h>
 #include <glib/gstdio.h>
 #include <glib.h>
@@ -44,7 +43,6 @@
 #include <unistd.h>
 
 #include "al-daemon.h"
-#include "lum.h"
 #include "notifier.h"
 #include "dbus_interface.h"
 #include "utils.h"
@@ -176,12 +174,16 @@ int main(int argc, char **argv)
     /* daemonize the application launcher */
     AlDaemonize();
     log_message("Daemon process was started !\n", 0);
+
+#ifdef USE_LAST_USER_MODE
     /* initialise the last user mode */
     if(!(l_ret=InitializeLastUserMode())){
       log_error_message("Last user mode initialization failed !\n", 0);
     }
     else { log_message("Last user mode initialized. Listening for method calls ....\n", 0);
     }
+#endif
+
     /* initialize SRM Daemon */
 	if(!initialize_al_dbus()){
 		log_error_message("Failed to initialize AL Daemon!\n Stopping daemon ...", 0);

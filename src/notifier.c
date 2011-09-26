@@ -23,7 +23,6 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <gconf/gconf-client.h>
 #include <getopt.h>
 #include <glib/gstdio.h>
 #include <glib.h>

@@ -5,15 +5,13 @@ AM_CPPFLAGS = -I$(top_srcdir)/inc
 bin_PROGRAMS = al-daemon
 al_daemon_SOURCES = src/al-daemon.c \
 		    src/dbus_interface.c \
-		    src/lum.c \
 		    src/utils.c \
 		    src/notifier.c \
 		    inc/al-daemon.h \
 		    inc/dbus_interface.h \
-		    inc/lum.h \
 		    inc/utils.h \
 		    inc/notifier.h \
-		    config.h 
+		    config.h
 al_daemon_LDADD = $(INTLLIBS) $(DBUS_LIBS) $(DBUSGLIB_LIBS) $(GLIB2_LIBS)
 al_daemon_CFLAGS = \
 		$(AM_CFLAGS) \
@@ -43,8 +41,16 @@ custom_marshallers:
 
 
 if BUILD_WITH_DEBUG
-    al_daemon_CFLAGS += -DDEBUG 
+    al_daemon_CFLAGS += -DDEBUG
 endif
+
+if BUILD_WITH_LUM
+al_daemon_SOURCES += src/lum.c \
+					 inc/lum.h
+
+al_daemon_CFLAGS += -DUSE_LAST_USER_MODE
+endif
+
 
 # Dirs of external packages
 pkgconfigdatadir=$(datadir)/pkgconfig

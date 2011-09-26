@@ -17,7 +17,6 @@
 * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA 
 * 
 */
-
 /* Function responsible to parse the service unit and extract ownership info */
 extern void ExtractOwnershipInfo(char *euid, char *egid, char *file);
 /* Function responsible to extract the user name from the uid */
