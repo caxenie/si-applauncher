@@ -3,7 +3,7 @@
 
 AC_PREREQ([2.65])
 
-AC_INIT([si-applauncher], [2.0], [cristian.axenie@windriver.com])
+AC_INIT([si-applauncher], [2.1], [cristian.axenie@windriver.com])
 AC_CONFIG_SRCDIR([src/al-daemon.c])
 AC_CONFIG_HEADERS([config.h])
 
