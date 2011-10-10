@@ -68,9 +68,13 @@ AC_ARG_ENABLE([lum],
                *) AC_MSG_ERROR([bad value ${enableval} for --disable-lum]) ;;
            esac],[lum=true])
 AM_CONDITIONAL([BUILD_WITH_LUM], [test "x$lum" = "xtrue"])
-AM_COND_IF([BUILD_WITH_LUM], [PKG_CHECK_MODULES(GCONF, [ gconf-2.0 ])])
-AC_SUBST(GCONF_CFLAGS)
-AC_SUBST(GCONF_LIBS)
+
+if test "x$lum" = "xtrue" 
+    then
+    PKG_CHECK_MODULES(GCONF, [ gconf-2.0 ])
+    AC_SUBST(GCONF_CFLAGS)
+    AC_SUBST(GCONF_LIBS)
+fi
 
 
 
