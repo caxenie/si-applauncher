@@ -34,94 +34,153 @@
 #define AL_SIGNAME_TASK_STOPPED "TaskStopped"
 #define AL_SIGNAME_NOTIFICATION "GlobalStateNotification"
 #define DIM_MAX 200
-#define AL_VERSION "1.6"
+#define AL_VERSION "2.1"
 #define AL_GCONF_CURRENT_USER_KEY "/current_user"
 #define AL_GCONF_LAST_USER_MODE_KEY "/last_mode"
 #define AL_PID_FILE "/var/run/al-daemon.pid"
+#define SYSTEMD_SERVICE_NAME         "org.freedesktop.systemd1"
+#define SYSTEMD_INTERFACE            "org.freedesktop.systemd1.Manager"
+#define SYSTEMD_PATH                 "/org/freedesktop/systemd1"
+#define SYSTEMD_UNIT_INFO_TIMEOUT 2000
 
-#define DBUS_SRM_INTROSPECT_XML "" \
-        "<!DOCTYPE node PUBLIC \"-//freedesktop//DTD "\
-        "D-BUS Object Introspection 1.0//EN\" "\
-        "\"http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd\">\n"\
-        "<node name=\"" SRM_OBJECT_PATH "\">\n"\
-        "  <interface name=\"" AL_METHOD_INTERFACE "\">\n"\
-        "    <method name=\"Run\">\n"\
-        "      <arg name=\"app_name\" type=\"s\" direction=\"in\"/>\n"\
-	"      <arg name=\"foreground\" type=\"b\" direction=\"in\"/>\n"\
-        "      <arg name=\"status\" type=\"b\" direction=\"out\"/>\n"\
-        "      <arg name=\"level\" type=\"u\" direction=\"out\"/>\n"\
-        "    </method>\n"\
-        "    <method name=\"RunAs\">\n"\
-        "      <arg name=\"app_name\" type=\"s\" direction=\"in\"/>\n"\
-        "      <arg name=\"app_uid\" type=\"i\" direction=\"in\"/>\n"\
-        "      <arg name=\"app_gid\" type=\"i\" direction=\"in\"/>\n"\
-	"      <arg name=\"foreground\" type=\"b\" direction=\"in\"/>\n"\
-        "      <arg name=\"status\" type=\"b\" direction=\"out\"/>\n"\
-        "      <arg name=\"level\" type=\"u\" direction=\"out\"/>\n"\
-        "    </method>\n"\
-        "    <method name=\"Stop\">\n"\
-        "      <arg name=\"app_pid\" type=\"u\" direction=\"in\"/>\n"\
-        "      <arg name=\"status\" type=\"b\" direction=\"out\"/>\n"\
-        "      <arg name=\"level\" type=\"u\" direction=\"out\"/>\n"\
-        "    </method>\n"\
-        "    <method name=\"StopAs\">\n"\
-        "      <arg name=\"app_pid\" type=\"u\" direction=\"in\"/>\n"\
-        "      <arg name=\"app_uid\" type=\"i\" direction=\"in\"/>\n"\
-        "      <arg name=\"app_gid\" type=\"i\" direction=\"in\"/>\n"\
-        "      <arg name=\"status\" type=\"b\" direction=\"out\"/>\n"\
-        "      <arg name=\"level\" type=\"u\" direction=\"out\"/>\n"\
-        "    </method>\n"\
-        "    <method name=\"Resume\">\n"\
-        "      <arg name=\"app_pid\" type=\"u\" direction=\"in\"/>\n"\
-        "      <arg name=\"status\" type=\"b\" direction=\"out\"/>\n"\
-        "      <arg name=\"level\" type=\"u\" direction=\"out\"/>\n"\
-        "    </method>\n"\
-        "    <method name=\"Suspend\">\n"\
-        "      <arg name=\"app_pid\" type=\"u\" direction=\"in\"/>\n"\
-        "      <arg name=\"status\" type=\"b\" direction=\"out\"/>\n"\
-        "      <arg name=\"level\" type=\"u\" direction=\"out\"/>\n"\
-        "    </method>\n"\
-        "    <method name=\"Restart\">\n"\
-        "      <arg name=\"app_name\" type=\"s\" direction=\"in\"/>\n"\
-        "      <arg name=\"status\" type=\"b\" direction=\"out\"/>\n"\
-        "      <arg name=\"level\" type=\"u\" direction=\"out\"/>\n"\
-        "    </method>\n"\
-        "    <method name=\"ChangeTaskState\">\n"\
-        "      <arg name=\"app_pid\" type=\"i\" direction=\"in\"/>\n"\
-        "      <arg name=\"foreground\" type=\"b\" direction=\"in\"/>\n"\
-	"      <arg name=\"status\" type=\"b\" direction=\"out\"/>\n"\
-        "      <arg name=\"level\" type=\"u\" direction=\"out\"/>\n"\
-        "    </method>\n"\
-        "  </interface>\n"\
-        "  <interface name=\"" AL_SIGNAL_INTERFACE "\">\n"\
-        "    <signal name=\"" AL_SIGNAME_NOTIFICATION "\">\n"\
-        "      <arg name=\"app_status\" type=\"s\"/>\n"\
-        "    </signal>\n"\
-        "    <signal name=\"" AL_SIGNAME_TASK_STARTED "\">\n"\
-        "      <arg name=\"app_state\" type=\"s\"/>\n"\
-        "    </signal>\n"\
-        "    <signal name=\"" AL_SIGNAME_TASK_STOPPED "\">\n"\
-        "      <arg name=\"app_state\" type=\"s\"/>\n"\
-        "    </signal>\n"\
-        "  </interface>\n"\
-        "</node>\n"
+/* add logging support */
+#include "al-log.h"
+#include <dbus/dbus.h>
+#include <dbus/dbus-glib-bindings.h>
+#include <dbus/dbus-glib-lowlevel.h>
+#include <pthread.h>
 
-/* Tracing support */
-extern unsigned char g_verbose;
+/* signal dispatcher thread defines */
+static pthread_t signal_dispatch_thread_id;
 
-/* macro for logging */
-#define log_message(format,args...) \
-			do{ \
-			    if(g_verbose) \
-				    fprintf(stdout,format,args); \
-			  } while(0);
+/* Structure representing the AL Daemon DBus object */
+typedef struct 
+{
+    GObject parent;
+} ALDbus;
+
+/* list of signals for the AL Daemon */
+enum
+{
+AL_SIG_TASK_STARTED,
+AL_SIG_TASK_STOPPED,
+AL_SIG_GLOBAL_NOTIFICATION,
+AL_SIG_CHANGE_STATE_COMPLETE,
+AL_SIG_COUNT
+};
+
+/* Structure representing the class for the AL Daemon DBus object */
+typedef struct
+{
+    GObjectClass parent;
+    guint ALSignals[AL_SIG_COUNT];
+} ALDbusClass;
+
+/*
+ * This function is provided by the G_DEFINE_TYPE macro. It is used
+ * when creating a new object and registering it on the system bus.
+ */
+GType al_dbus_get_type(void);
+
+/* AL Daemon API callbacks */
+
+/* method calls */
+
+gboolean al_dbus_run(
+		ALDbus *server,
+		gchar *command_line,
+		gint parent_pid,
+		gboolean foreground,
+		DBusGMethodInvocation *context
+);
+
+gboolean al_dbus_run_as(
+		ALDbus *server,
+		gchar *command_line,
+		gint parent_pid,
+		gboolean foreground,
+		gint app_uid,
+		gint app_gid,
+		DBusGMethodInvocation *context
+);
+
+gboolean al_dbus_stop(
+		ALDbus *server,
+		gint app_pid,
+		DBusGMethodInvocation *context
+);
+
+gboolean al_dbus_resume(
+		ALDbus *server,
+		gint app_pid,
+		DBusGMethodInvocation *context
+);
+
+gboolean al_dbus_suspend(
+		ALDbus *server,
+		gint app_pid,
+		DBusGMethodInvocation *context
+);
+
+gboolean al_dbus_stop_as(
+		ALDbus *server,
+		gint app_pid,
+		gint app_uid,
+		gint app_gid,
+		DBusGMethodInvocation *context
+);
+
+gboolean al_dbus_restart(
+		ALDbus *server,
+		gchar* app_name,
+		DBusGMethodInvocation *context
+);
+
+gboolean al_dbus_change_task_state(
+		ALDbus *server,
+		gint app_pid,
+		gboolean foreground,
+		DBusGMethodInvocation *context
+);
+
+/* signals */
+
+gboolean al_dbus_global_state_notification(
+		ALDbus *server,
+		gchar *app_status
+);
+
+gboolean al_dbus_task_started(
+		ALDbus *server,
+		gint app_pid,
+		gchar *image_path
+);
+
+gboolean al_dbus_task_stopped(
+		ALDbus *server,
+		gint app_pid,
+		gchar *image_path
+);
+
+gboolean al_dbus_change_task_state_complete(
+			ALDbus *server,
+			gchar *app_name,
+			gchar *app_state
+);
+
+/* Function responsible to initialize the AL Daemon DBus interface */
+
+gboolean initialize_al_dbus();
+
+/* Function responsible to cleanup the resources associated with the AL Daemon DBus interface 
+ */
+
+gboolean terminate_al_dbus();
 
 /* Function responsible with the command line interface output */
 extern void AlPrintCLI();
 /* Function responsible with command line options parsing */
 extern void AlParseCLIOptions(int argc, char *const *argv);
-/* Server that exposes methods and waits for it to be called */
-extern void AlListenToMethodCall();
 /* Signal handler for the daemon */
 extern void AlSignalHandler(int sig);
 

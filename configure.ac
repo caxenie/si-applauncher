@@ -3,7 +3,7 @@
 
 AC_PREREQ([2.65])
 
-AC_INIT([si-applauncher], [1.6], [cristian.axenie@windriver.com])
+AC_INIT([si-applauncher], [2.1], [cristian.axenie@windriver.com])
 AC_CONFIG_SRCDIR([src/al-daemon.c])
 AC_CONFIG_HEADERS([config.h])
 
@@ -51,9 +51,32 @@ PKG_CHECK_MODULES(GLIB2, [ glib-2.0 ])
 AC_SUBST(GLIB2_CFLAGS)
 AC_SUBST(GLIB2_LIBS)
 
-PKG_CHECK_MODULES(GCONF, [ gconf-2.0 ])
-AC_SUBST(GCONF_CFLAGS)
-AC_SUBST(GCONF_LIBS)
+AC_ARG_ENABLE([debug],
+                AS_HELP_STRING([--enable-debug],[Build al-daemon enabling syslog debug messages]),
+        	    [case "${enableval}" in
+	            yes) debug=true ;;
+        	    no) debug=false ;;
+	            *) AC_MSG_ERROR([bad value ${enableval} for --enable-debug]) ;;
+        	esac],[debug=false])
+AM_CONDITIONAL([BUILD_WITH_DEBUG], [test "x$debug" = "xtrue"])
+
+AC_ARG_ENABLE([lum], 
+              AS_HELP_STRING([--disable-lum],[build al-daemon disabling last user mode]),
+              [case "${enableval}" in
+               yes) lum=true ;;
+               no) lum=false ;;
+               *) AC_MSG_ERROR([bad value ${enableval} for --disable-lum]) ;;
+           esac],[lum=true])
+AM_CONDITIONAL([BUILD_WITH_LUM], [test "x$lum" = "xtrue"])
+
+if test "x$lum" = "xtrue" 
+    then
+    PKG_CHECK_MODULES(GCONF, [ gconf-2.0 ])
+    AC_SUBST(GCONF_CFLAGS)
+    AC_SUBST(GCONF_LIBS)
+fi
+
+
 
 
 # Checks for libraries.
