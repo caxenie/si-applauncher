@@ -1,3 +1,11 @@
+GENIVI builds its reusable, IVI platform based on a flexible but standard Reference Architecture.  This Reference Architecture serves as a blueprint for building a full IVI solution and it also shows the primary target functional areas of GENIVI's work.  The Compliance Specification steers the standardization,  specifying exactly what is expected in the architecture implementation to build a GENIVI Compliant(r) solution. 
+
+Lifecycle deals with the startup, shutdown and management of the running of system
+components and integrated applications. It also keeps track of the state, and the
+status (health) of the system, including:
+- Power-, Node state-, Boot- and Resource management.
+- Interfaces to/of Thermal- and Supply management. 
+
 
 The application launcher component (al-daemon) provides an API to enable state change
 for the applications running in the system at a certain moment. The exported functionality
